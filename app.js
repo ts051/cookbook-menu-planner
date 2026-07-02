@@ -246,10 +246,13 @@ async function handleAuthSubmit(event) {
 
   const { error } = await supabaseClient.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.href.split("#")[0] }
+    options: {
+      emailRedirectTo: window.location.href.split("#")[0],
+      shouldCreateUser: false
+    }
   });
 
-  els.authBadge.textContent = error ? "送信失敗" : "メール送信済み";
+  els.authBadge.textContent = error ? "未登録または送信失敗" : "メール送信済み";
 }
 
 async function signOut() {
