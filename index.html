@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cookbook Menu Planner</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./supabase-config.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <img src="./assets/cookbook-worktop.png" alt="" />
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <div class="status-row">
+            <span id="storageBadge" class="badge">Local</span>
+            <span id="authBadge" class="badge muted">未接続</span>
+          </div>
+          <h1>Cookbook Menu Planner</h1>
+          <div class="hero-actions">
+            <button id="seedButton" class="primary-button" type="button">
+              <i data-lucide="database"></i>
+              サンプル投入
+            </button>
+            <button id="syncButton" class="secondary-button" type="button">
+              <i data-lucide="refresh-cw"></i>
+              再読込
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section id="authPanel" class="auth-panel hidden">
+          <div>
+            <h2>ログイン</h2>
+            <p>Supabase Authのメールリンクでデータを同期します。</p>
+          </div>
+          <form id="authForm" class="auth-form">
+            <input id="emailInput" type="email" autocomplete="email" placeholder="email@example.com" required />
+            <button class="primary-button" type="submit">
+              <i data-lucide="mail"></i>
+              送信
+            </button>
+            <button id="signOutButton" class="secondary-button hidden" type="button">
+              <i data-lucide="log-out"></i>
+              ログアウト
+            </button>
+          </form>
+        </section>
+
+        <section class="dashboard-grid">
+          <div class="panel recipe-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>レシピDB</h2>
+                <span id="recipeCount" class="subtle"></span>
+              </div>
+              <button id="clearFormButton" class="icon-button" type="button" title="フォームを空にする">
+                <i data-lucide="eraser"></i>
+              </button>
+            </div>
+
+            <form id="recipeForm" class="recipe-form">
+              <input id="recipeId" type="hidden" />
+              <label>
+                料理名
+                <input id="titleInput" type="text" placeholder="鮭の南蛮漬け" required />
+              </label>
+              <div class="form-row">
+                <label>
+                  出典
+                  <input id="sourceInput" type="text" placeholder="和食の基本 p.42" />
+                </label>
+                <label>
+                  人数
+                  <input id="servingsInput" type="number" min="1" max="12" value="2" />
+                </label>
+              </div>
+              <label>
+                タグ
+                <input id="tagsInput" type="text" placeholder="和食, 魚, 作り置き" />
+              </label>
+              <label>
+                材料
+                <textarea id="ingredientsInput" rows="6" placeholder="鮭 2切れ&#10;玉ねぎ 1/2個&#10;酢 大さじ3"></textarea>
+              </label>
+              <label>
+                行程
+                <textarea id="stepsInput" rows="5" placeholder="1. 鮭に塩をふる&#10;2. 野菜を切る&#10;3. 調味料に漬ける"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary-button" type="submit">
+                  <i data-lucide="save"></i>
+                  保存
+                </button>
+                <button id="deleteRecipeButton" class="danger-button hidden" type="button">
+                  <i data-lucide="trash-2"></i>
+                  削除
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel import-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>電子書籍テキスト</h2>
+                <span class="subtle">材料 / 作り方 見出しに対応</span>
+              </div>
+              <button id="parseButton" class="icon-button" type="button" title="テキストから抽出">
+                <i data-lucide="scan-text"></i>
+              </button>
+            </div>
+            <textarea id="ebookInput" rows="12" placeholder="料理名&#10;材料（2人分）&#10;鶏もも肉 300g&#10;長ねぎ 1本&#10;&#10;作り方&#10;1. 材料を切る&#10;2. フライパンで焼く"></textarea>
+            <div id="parseResult" class="parse-result"></div>
+          </div>
+
+          <div class="panel plan-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>月間献立</h2>
+                <span id="monthLabel" class="subtle"></span>
+              </div>
+              <div class="compact-actions">
+                <button id="prevMonthButton" class="icon-button" type="button" title="前月">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <button id="nextMonthButton" class="icon-button" type="button" title="翌月">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            <div class="plan-tools">
+              <button id="suggestMonthButton" class="primary-button" type="button">
+                <i data-lucide="wand-sparkles"></i>
+                今月を提案
+              </button>
+              <select id="recipeSelect" aria-label="献立に入れるレシピ"></select>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </div>
+
+          <div class="panel list-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>買い物リスト</h2>
+                <span id="weekLabel" class="subtle"></span>
+              </div>
+              <div class="compact-actions">
+                <button id="prevWeekButton" class="icon-button" type="button" title="前週">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <button id="nextWeekButton" class="icon-button" type="button" title="翌週">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            <div id="shoppingList" class="shopping-list"></div>
+          </div>
+        </section>
+
+        <section class="panel recipe-list-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>登録済みレシピ</h2>
+              <span class="subtle">献立候補</span>
+            </div>
+            <input id="searchInput" class="search-input" type="search" placeholder="検索" />
+          </div>
+          <div id="recipeList" class="recipe-list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

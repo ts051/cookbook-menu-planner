@@ -1,0 +1,5 @@
+window.COOKBOOK_APP_CONFIG = {
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
+  REQUIRE_AUTH: true
+};
