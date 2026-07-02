@@ -36,12 +36,12 @@ anon keyはブラウザに公開されます。公開アプリでは `REQUIRE_AU
 
 ## GitHub Pages
 
-このフォルダの中身をリポジトリのルートに置く場合、同梱の `.github/workflows/pages.yml` でGitHub Actionsから公開できます。
+このリポジトリは `main` ブランチのルートをGitHub Pagesで公開します。
 
-GitHub側で必要な設定:
+GitHub側の設定:
 
 1. Settings > Pages を開きます。
-2. Build and deployment の Source を `GitHub Actions` にします。
-3. `main` ブランチへpushすると自動公開されます。
+2. Build and deployment の Source を `Deploy from a branch` にします。
+3. Branch を `main`、folder を `/ (root)` にします。
 
-既存リポジトリ配下のサブフォルダとして置く場合は、workflowの `Upload artifact` の `path` を `cookbook-menu-planner` に変更してください。
+このアプリはビルド不要の静的ファイル構成です。
