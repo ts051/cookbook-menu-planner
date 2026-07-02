@@ -18,7 +18,11 @@ node dev-server.mjs
 1. Supabaseで新規プロジェクトを作成します。
 2. SQL Editorで `supabase-schema.sql` を実行します。
 3. Authentication > URL Configuration でGitHub PagesのURLを許可します。
-4. `supabase-config.js` にProject URLとanon public keyを入れます。
+4. GitHubリポジトリの Settings > Secrets and variables > Actions に以下を登録します。
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+
+ローカルでSupabase接続を試す場合は、`supabase-config.js` にProject URLとanon public keyを入れます。
 
 ```js
 window.COOKBOOK_APP_CONFIG = {
