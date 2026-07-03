@@ -7,6 +7,9 @@ const isConfigured = Boolean(
 );
 
 const STORAGE_KEY = "cookbook-menu-planner:v1";
+const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
+const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
+const USERNAME_PATTERN = /^[a-z0-9._-]{3,40}$/;
 const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
 const sampleRecipes = [
   {
@@ -87,6 +90,7 @@ let state = {
   recipes: [],
   plan: [],
   checks: {},
+  profile: null,
   monthCursor: startOfMonth(new Date()),
   weekCursor: startOfWeek(new Date())
 };
@@ -112,6 +116,9 @@ function bindElements() {
     "authForm",
     "usernameInput",
     "passwordInput",
+    "profileForm",
+    "displayNameInput",
+    "newPasswordInput",
     "signOutButton",
     "seedButton",
     "syncButton",
@@ -148,6 +155,7 @@ function bindElements() {
 
 function bindEvents() {
   els.authForm.addEventListener("submit", handleAuthSubmit);
+  els.profileForm.addEventListener("submit", handleProfileSave);
   els.signOutButton.addEventListener("click", signOut);
   els.seedButton.addEventListener("click", seedSamples);
   els.syncButton.addEventListener("click", async () => {
@@ -239,27 +247,204 @@ function loadScript(src, id) {
   });
 }
 
+function normalizeUsername(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function isValidUsername(value) {
+  return USERNAME_PATTERN.test(normalizeUsername(value));
+}
+
+function usernameToEmail(username) {
+  return `${normalizeUsername(username) || "user"}@${INTERNAL_EMAIL_DOMAIN}`;
+}
+
+function usernameToLegacyEmail(username) {
+  return `${normalizeUsername(username) || "user"}@${LEGACY_EMAIL_DOMAIN}`;
+}
+
+function emailLocalPart(email) {
+  return normalizeUsername(String(email || "").split("@")[0]);
+}
+
+function isMissingLoginIdsTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    message.includes('relation "public.login_ids" does not exist') ||
+    (message.includes("schema cache") && message.includes("login_ids")) ||
+    (message.includes("could not find") && message.includes("login_ids"))
+  );
+}
+
+async function lookupLoginId(username) {
+  try {
+    const { data, error } = await supabaseClient
+      .from("login_ids")
+      .select("auth_email, is_active")
+      .eq("login_id", normalizeUsername(username))
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return { email: null, blocked: false };
+    return { email: data.is_active ? data.auth_email : null, blocked: !data.is_active };
+  } catch (error) {
+    if (!isMissingLoginIdsTable(error)) console.warn("Login ID lookup failed:", error);
+    return { email: null, blocked: false };
+  }
+}
+
+async function signInWithUsername(username, password) {
+  const normalized = normalizeUsername(username);
+  if (!isValidUsername(normalized)) return { error: new Error("Invalid username.") };
+
+  const loginId = await lookupLoginId(normalized);
+  if (loginId.blocked) return { error: new Error("Login ID has been changed.") };
+
+  const emails = [loginId.email, usernameToEmail(normalized), usernameToLegacyEmail(normalized)].filter(Boolean);
+  let lastError = null;
+  for (const email of [...new Set(emails)]) {
+    const result = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (!result.error) return result;
+    lastError = result.error;
+  }
+  return { error: lastError || new Error("Login failed.") };
+}
+
+async function getProfile(user) {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, username")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function ensureProfile(user, username) {
+  const profile = await getProfile(user);
+  if (profile) return profile;
+
+  const nextUsername = normalizeUsername(username) || emailLocalPart(user.email) || "user";
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .insert({ id: user.id, username: nextUsername })
+    .select("id, username")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function replaceLoginId(user, loginId, required) {
+  const normalized = normalizeUsername(loginId);
+  if (!normalized) return;
+
+  const row = {
+    login_id: normalized,
+    user_id: user.id,
+    auth_email: user.email || usernameToEmail(normalized),
+    is_active: true
+  };
+
+  const { error: upsertError } = await supabaseClient
+    .from("login_ids")
+    .upsert(row, { onConflict: "login_id" });
+  if (upsertError) {
+    if (required && isMissingLoginIdsTable(upsertError)) {
+      throw new Error("ログインID管理テーブルが未設定です。supabase-schema.sql を Supabase に適用してください。");
+    }
+    if (required || !isMissingLoginIdsTable(upsertError)) throw upsertError;
+    return;
+  }
+
+  const { error: retireError } = await supabaseClient
+    .from("login_ids")
+    .update({ auth_email: null, is_active: false })
+    .eq("user_id", user.id)
+    .neq("login_id", normalized);
+  if (retireError) {
+    if (required && isMissingLoginIdsTable(retireError)) {
+      throw new Error("ログインID管理テーブルが未設定です。supabase-schema.sql を Supabase に適用してください。");
+    }
+    if (required || !isMissingLoginIdsTable(retireError)) throw retireError;
+  }
+}
+
 async function handleAuthSubmit(event) {
   event.preventDefault();
   if (!supabaseClient) return;
-  const email = usernameToAuthEmail(els.usernameInput.value);
+  const username = normalizeUsername(els.usernameInput.value);
   const password = els.passwordInput.value;
-  if (!email || !password) {
+  if (!isValidUsername(username) || !password) {
     els.authBadge.textContent = "入力を確認";
     return;
   }
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  const result = await signInWithUsername(username, password);
+  if (result.error) {
+    els.authBadge.textContent = "ログイン失敗";
+    return;
+  }
 
-  els.authBadge.textContent = error ? "ログイン失敗" : "ログイン済み";
-  if (!error) els.authForm.reset();
+  currentUser = result.data.user || result.data.session?.user || currentUser;
+  if (currentUser) {
+    const profile = await ensureProfile(currentUser, username);
+    await replaceLoginId(currentUser, profile.username, false);
+    state.profile = profile;
+  }
+
+  els.authBadge.textContent = "ログイン済み";
+  els.authForm.reset();
+  await loadAll();
+  render();
+}
+
+async function handleProfileSave(event) {
+  event.preventDefault();
+  if (!canUseRemote()) return;
+
+  const username = normalizeUsername(els.displayNameInput.value);
+  const password = els.newPasswordInput.value;
+  if (!isValidUsername(username)) {
+    els.authBadge.textContent = "英数字のユーザー名にしてください";
+    return;
+  }
+  if (password && password.length < 6) {
+    els.authBadge.textContent = "パスワードは6文字以上";
+    return;
+  }
+
+  try {
+    const profile = await ensureProfile(currentUser, username);
+    if (password) {
+      const { error } = await supabaseClient.auth.updateUser({ password });
+      if (error) throw error;
+    }
+    await replaceLoginId(currentUser, username, true);
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .update({ username })
+      .eq("id", currentUser.id)
+      .select("id, username")
+      .single();
+    if (error) throw error;
+    state.profile = data || { ...profile, username };
+    els.newPasswordInput.value = "";
+    els.authBadge.textContent = username;
+    renderAuth();
+  } catch (error) {
+    console.error(error);
+    els.authBadge.textContent = "保存失敗";
+  }
 }
 
 async function signOut() {
   if (!supabaseClient) return;
+  state.profile = null;
   await supabaseClient.auth.signOut();
 }
 
@@ -276,15 +461,21 @@ async function loadAll() {
 }
 
 async function loadRemote() {
-  const [{ data: recipes, error: recipesError }, { data: plan, error: planError }, { data: checks, error: checksError }] =
+  const [
+    { data: recipes, error: recipesError },
+    { data: plan, error: planError },
+    { data: checks, error: checksError },
+    { data: profile, error: profileError }
+  ] =
     await Promise.all([
       supabaseClient.from("recipes").select("*").order("created_at", { ascending: false }),
       supabaseClient.from("meal_plan_entries").select("*").order("plan_date", { ascending: true }),
-      supabaseClient.from("shopping_checks").select("*")
+      supabaseClient.from("shopping_checks").select("*"),
+      supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle()
     ]);
 
-  if (recipesError || planError || checksError) {
-    console.error(recipesError || planError || checksError);
+  if (recipesError || planError || checksError || profileError) {
+    console.error(recipesError || planError || checksError || profileError);
     loadLocal();
     return;
   }
@@ -292,6 +483,10 @@ async function loadRemote() {
   state.recipes = recipes || [];
   state.plan = plan || [];
   state.checks = Object.fromEntries((checks || []).map((item) => [item.item_key, item.checked]));
+  state.profile = profile || (currentUser ? await ensureProfile(currentUser, emailLocalPart(currentUser.email)) : null);
+  if (currentUser && state.profile?.username) {
+    await replaceLoginId(currentUser, state.profile.username, false);
+  }
 }
 
 function loadLocal() {
@@ -300,6 +495,7 @@ function loadLocal() {
     state.recipes = [];
     state.plan = [];
     state.checks = {};
+    state.profile = null;
     return;
   }
 
@@ -308,10 +504,12 @@ function loadLocal() {
     state.recipes = saved.recipes || [];
     state.plan = saved.plan || [];
     state.checks = saved.checks || {};
+    state.profile = saved.profile || null;
   } catch {
     state.recipes = [];
     state.plan = [];
     state.checks = {};
+    state.profile = null;
   }
 }
 
@@ -321,7 +519,8 @@ function saveLocal() {
     JSON.stringify({
       recipes: state.recipes,
       plan: state.plan,
-      checks: state.checks
+      checks: state.checks,
+      profile: state.profile
     })
   );
 }
@@ -347,19 +546,13 @@ function renderAuth() {
   els.usernameInput.classList.toggle("hidden", Boolean(currentUser));
   els.passwordInput.classList.toggle("hidden", Boolean(currentUser));
   els.authForm.querySelector("button[type='submit']").classList.toggle("hidden", Boolean(currentUser));
-  els.authBadge.textContent = currentUser ? displayUsername(currentUser.email) : "未ログイン";
+  els.profileForm.classList.toggle("hidden", !currentUser);
+  els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser?.email) || "";
+  els.authBadge.textContent = currentUser ? displayUsername() : "未ログイン";
 }
 
-function usernameToAuthEmail(value) {
-  const username = String(value || "").trim().toLowerCase();
-  if (username.includes("@")) return username;
-  if (!/^[a-z0-9._-]{3,40}$/.test(username)) return "";
-  return `${username}@cookbook.local`;
-}
-
-function displayUsername(email) {
-  const value = String(email || "");
-  return value.endsWith("@cookbook.local") ? value.replace("@cookbook.local", "") : value;
+function displayUsername() {
+  return state.profile?.username || emailLocalPart(currentUser?.email) || "ログイン済み";
 }
 
 function renderRecipeFormState() {

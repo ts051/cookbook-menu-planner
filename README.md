@@ -1,51 +1,35 @@
 # Cookbook Menu Planner
 
-GitHub Pages + Supabaseで公開できる、料理本レシピDB、月間献立、週間買い物リストの静的Webアプリです。
+料理本の電子書籍から材料・行程を整理し、月間献立の提案と週間買い物リストを作る静的Webアプリです。GitHub Pagesで公開し、データ保存とログインはSupabaseを使います。
 
 ## ローカル確認
-
-`index.html` をブラウザで開くと、Supabase未設定のままローカル保存で動きます。
-
-PowerShellで簡易サーバーを使う場合:
 
 ```powershell
 cd C:\Users\masam\r_app\cookbook-menu-planner
 node dev-server.mjs
 ```
 
+Supabase未設定でもローカル保存で動作します。公開版では `supabase-config.js` の `REQUIRE_AUTH: true` を使い、ログイン済みユーザーだけがデータを読み書きできます。
+
 ## Supabase設定
 
-1. Supabaseで新規プロジェクトを作成します。
-2. SQL Editorで `supabase-schema.sql` を実行します。
-3. Authentication > URL Configuration でGitHub PagesのURLを許可します。
-4. `supabase-config.js` にProject URLとanon public keyを入れてpushします。
+1. SQL Editorで `supabase-schema.sql` を実行します。
+2. Authentication > Providers > Emailで公開サインアップを無効にします。
+3. Authentication > URL ConfigurationにGitHub PagesのURLを追加します。
+4. `supabase-config.js` にProject URLとpublishable keyを設定します。
 
-anon public keyはブラウザに公開される前提のキーです。データ保護は `supabase-schema.sql` のRLSで行います。
+## ユーザー作成とログインID
 
-## ユーザー作成
+公開ページからアカウント新規作成はできません。ユーザーはSupabase DashboardのAuthenticationで管理者が作成します。
 
-公開ページからの新規登録は無効です。Supabase DashboardのAuthenticationでユーザーを作成してください。
+ログイン画面ではメールアドレスではなく、ユーザー名とパスワードを入力します。最初のAuthユーザー作成時は、内部用メールとして `ユーザー名@cookbook.local` のようなアドレスを使えます。
 
-ログイン画面のユーザー名 `taro` は、Supabase Auth上では `taro@cookbook.local` として扱います。ユーザーを作成するときは、この形式のメールアドレスとパスワードを設定します。
-
-```js
-window.COOKBOOK_APP_CONFIG = {
-  SUPABASE_URL: "https://YOUR_PROJECT_ID.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
-  REQUIRE_AUTH: true
-};
-```
-
-anon keyはブラウザに公開されます。公開アプリでは `REQUIRE_AUTH: true` のまま使い、`supabase-schema.sql` のRLSを有効にしてください。
+ユーザー名を変更してもSupabase Authのメールアドレスは変更しません。アプリは `profiles.username` と `login_ids` テーブルでログインIDを管理するため、`s_cale` と同じように、ログイン用ユーザー名をAuthメールとは別に変更できます。
 
 ## GitHub Pages
 
 このリポジトリは `main` ブランチのルートをGitHub Pagesで公開します。
 
-GitHub側の設定:
+公開URL:
 
-1. Settings > Pages を開きます。
-2. Build and deployment の Source を `Deploy from a branch` にします。
-3. Branch を `main`、folder を `/ (root)` にします。
-
-このアプリはビルド不要の静的ファイル構成です。
+https://ts051.github.io/cookbook-menu-planner/
