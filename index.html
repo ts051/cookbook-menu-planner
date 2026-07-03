@@ -36,13 +36,14 @@
         <section id="authPanel" class="auth-panel hidden">
           <div>
             <h2>ログイン</h2>
-            <p>Supabase Authのメールリンクでデータを同期します。</p>
+            <p>登録済みユーザーのみデータを同期します。</p>
           </div>
           <form id="authForm" class="auth-form">
-            <input id="emailInput" type="email" autocomplete="email" placeholder="email@example.com" required />
+            <input id="usernameInput" type="text" autocomplete="username" placeholder="ユーザー名" required />
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="パスワード" required />
             <button class="primary-button" type="submit">
-              <i data-lucide="mail"></i>
-              送信
+              <i data-lucide="key-round"></i>
+              ログイン
             </button>
             <button id="signOutButton" class="secondary-button hidden" type="button">
               <i data-lucide="log-out"></i>

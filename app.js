@@ -110,7 +110,8 @@ function bindElements() {
     "authBadge",
     "authPanel",
     "authForm",
-    "emailInput",
+    "usernameInput",
+    "passwordInput",
     "signOutButton",
     "seedButton",
     "syncButton",
@@ -241,18 +242,20 @@ function loadScript(src, id) {
 async function handleAuthSubmit(event) {
   event.preventDefault();
   if (!supabaseClient) return;
-  const email = els.emailInput.value.trim();
-  if (!email) return;
+  const email = usernameToAuthEmail(els.usernameInput.value);
+  const password = els.passwordInput.value;
+  if (!email || !password) {
+    els.authBadge.textContent = "入力を確認";
+    return;
+  }
 
-  const { error } = await supabaseClient.auth.signInWithOtp({
+  const { error } = await supabaseClient.auth.signInWithPassword({
     email,
-    options: {
-      emailRedirectTo: window.location.href.split("#")[0],
-      shouldCreateUser: false
-    }
+    password
   });
 
-  els.authBadge.textContent = error ? "未登録または送信失敗" : "メール送信済み";
+  els.authBadge.textContent = error ? "ログイン失敗" : "ログイン済み";
+  if (!error) els.authForm.reset();
 }
 
 async function signOut() {
@@ -341,9 +344,22 @@ function renderAuth() {
 
   els.authPanel.classList.toggle("hidden", !config.REQUIRE_AUTH);
   els.signOutButton.classList.toggle("hidden", !currentUser);
-  els.emailInput.classList.toggle("hidden", Boolean(currentUser));
+  els.usernameInput.classList.toggle("hidden", Boolean(currentUser));
+  els.passwordInput.classList.toggle("hidden", Boolean(currentUser));
   els.authForm.querySelector("button[type='submit']").classList.toggle("hidden", Boolean(currentUser));
-  els.authBadge.textContent = currentUser ? currentUser.email : "未ログイン";
+  els.authBadge.textContent = currentUser ? displayUsername(currentUser.email) : "未ログイン";
+}
+
+function usernameToAuthEmail(value) {
+  const username = String(value || "").trim().toLowerCase();
+  if (username.includes("@")) return username;
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) return "";
+  return `${username}@cookbook.local`;
+}
+
+function displayUsername(email) {
+  const value = String(email || "");
+  return value.endsWith("@cookbook.local") ? value.replace("@cookbook.local", "") : value;
 }
 
 function renderRecipeFormState() {

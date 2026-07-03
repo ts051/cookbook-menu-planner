@@ -22,6 +22,12 @@ node dev-server.mjs
 
 anon public keyはブラウザに公開される前提のキーです。データ保護は `supabase-schema.sql` のRLSで行います。
 
+## ユーザー作成
+
+公開ページからの新規登録は無効です。Supabase DashboardのAuthenticationでユーザーを作成してください。
+
+ログイン画面のユーザー名 `taro` は、Supabase Auth上では `taro@cookbook.local` として扱います。ユーザーを作成するときは、この形式のメールアドレスとパスワードを設定します。
+
 ```js
 window.COOKBOOK_APP_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT_ID.supabase.co",
