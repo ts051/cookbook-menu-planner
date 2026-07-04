@@ -15,8 +15,11 @@
         <div class="hero-overlay"></div>
         <div class="hero-content">
           <div class="status-row">
-            <span id="storageBadge" class="badge">Local</span>
-            <span id="authBadge" class="badge muted">未接続</span>
+            <button id="menuButton" class="menu-button" type="button" aria-controls="appMenu" aria-expanded="false">
+              <i data-lucide="menu"></i>
+              <span>メニュー</span>
+            </button>
+            <span id="storageBadge" class="hidden">Local</span>
           </div>
           <h1>Cookbook Menu Planner</h1>
           <div class="hero-actions">
@@ -32,11 +35,44 @@
         </div>
       </header>
 
+      <div id="menuOverlay" class="menu-overlay hidden"></div>
+      <aside id="appMenu" class="app-menu hidden" aria-hidden="true">
+        <div class="menu-header">
+          <div>
+            <span class="today-label">アカウント</span>
+            <strong id="menuUserName">未ログイン</strong>
+          </div>
+          <button id="menuCloseButton" class="icon-button" type="button" title="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div id="menuStatus" class="menu-status"></div>
+        <form id="profileForm" class="menu-form hidden">
+          <label>
+            ユーザー名
+            <input id="displayNameInput" type="text" autocomplete="username" maxlength="40" placeholder="ユーザー名" required />
+          </label>
+          <label>
+            新しいパスワード
+            <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="変更しない場合は空欄" />
+          </label>
+          <button class="secondary-button" type="submit">
+            <i data-lucide="user-round-pen"></i>
+            保存
+          </button>
+        </form>
+        <button id="signOutButton" class="secondary-button hidden" type="button">
+          <i data-lucide="log-out"></i>
+          ログアウト
+        </button>
+      </aside>
+
       <main class="workspace">
         <section id="authPanel" class="auth-panel hidden">
           <div>
             <h2>ログイン</h2>
             <p>登録済みユーザーのみデータを同期します。</p>
+            <span id="authBadge" class="auth-message">未ログイン</span>
           </div>
           <form id="authForm" class="auth-form">
             <input id="usernameInput" type="text" autocomplete="username" maxlength="40" placeholder="ユーザー名" required />
@@ -44,18 +80,6 @@
             <button class="primary-button" type="submit">
               <i data-lucide="key-round"></i>
               ログイン
-            </button>
-            <button id="signOutButton" class="secondary-button hidden" type="button">
-              <i data-lucide="log-out"></i>
-              ログアウト
-            </button>
-          </form>
-          <form id="profileForm" class="auth-form hidden">
-            <input id="displayNameInput" type="text" autocomplete="username" maxlength="40" placeholder="ユーザー名" required />
-            <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="新しいパスワード（任意）" />
-            <button class="secondary-button" type="submit">
-              <i data-lucide="user-round-pen"></i>
-              保存
             </button>
           </form>
         </section>
@@ -155,6 +179,13 @@
               </div>
               <button id="parseButton" class="icon-button" type="button" title="テキストから抽出">
                 <i data-lucide="scan-text"></i>
+              </button>
+            </div>
+            <div class="file-import-row">
+              <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
+              <button id="pdfImportButton" class="secondary-button" type="button">
+                <i data-lucide="file-text"></i>
+                PDF読込
               </button>
             </div>
             <textarea id="ebookInput" rows="12" placeholder="料理名&#10;材料（2人分）&#10;鶏もも肉 300g&#10;長ねぎ 1本&#10;&#10;作り方&#10;1. 材料を切る&#10;2. フライパンで焼く"></textarea>

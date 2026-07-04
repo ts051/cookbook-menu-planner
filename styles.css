@@ -108,6 +108,73 @@ button {
   color: var(--muted);
 }
 
+.menu-button {
+  min-height: 42px;
+  border: 1px solid rgba(38, 56, 79, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--navy);
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.menu-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  background: rgba(31, 41, 51, 0.32);
+}
+
+.app-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 29;
+  width: min(360px, 100%);
+  background: #fff;
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 48px rgba(31, 41, 51, 0.18);
+  padding: 18px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.menu-header strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--navy);
+  font-size: 1.15rem;
+}
+
+.menu-status,
+.auth-message {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.menu-form {
+  display: grid;
+  gap: 12px;
+}
+
 .workspace {
   width: min(1180px, calc(100% - 32px));
   margin: -32px auto 48px;
@@ -368,6 +435,13 @@ select:focus {
   font-size: 0.88rem;
 }
 
+.file-import-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .plan-tools {
   margin-bottom: 14px;
   align-items: stretch;
@@ -593,6 +667,15 @@ select:focus {
     font-size: 0.84rem;
   }
 
+  .menu-button span {
+    display: none;
+  }
+
+  .app-menu {
+    width: min(340px, 92vw);
+    padding-bottom: 86px;
+  }
+
   .workspace {
     width: min(100% - 20px, 1180px);
     margin-top: -18px;
@@ -653,6 +736,10 @@ select:focus {
 
   .quick-list {
     min-height: 0;
+  }
+
+  .file-import-row {
+    grid-template-columns: 1fr;
   }
 
   .shopping-item {

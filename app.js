@@ -115,6 +115,12 @@ function bindElements() {
     "authBadge",
     "authPanel",
     "authForm",
+    "menuButton",
+    "menuCloseButton",
+    "menuOverlay",
+    "appMenu",
+    "menuUserName",
+    "menuStatus",
     "todayDateLabel",
     "todayMealTitle",
     "todayMealMeta",
@@ -143,6 +149,8 @@ function bindElements() {
     "clearFormButton",
     "deleteRecipeButton",
     "ebookInput",
+    "pdfInput",
+    "pdfImportButton",
     "parseButton",
     "parseResult",
     "monthLabel",
@@ -163,6 +171,9 @@ function bindElements() {
 }
 
 function bindEvents() {
+  els.menuButton.addEventListener("click", toggleMenu);
+  els.menuCloseButton.addEventListener("click", closeMenu);
+  els.menuOverlay.addEventListener("click", closeMenu);
   els.authForm.addEventListener("submit", handleAuthSubmit);
   els.profileForm.addEventListener("submit", handleProfileSave);
   els.signOutButton.addEventListener("click", signOut);
@@ -175,6 +186,7 @@ function bindEvents() {
   els.clearFormButton.addEventListener("click", clearRecipeForm);
   els.deleteRecipeButton.addEventListener("click", deleteSelectedRecipe);
   els.parseButton.addEventListener("click", parseEbookText);
+  els.pdfImportButton.addEventListener("click", importPdfFile);
   els.prevMonthButton.addEventListener("click", () => moveMonth(-1));
   els.nextMonthButton.addEventListener("click", () => moveMonth(1));
   els.suggestMonthButton.addEventListener("click", suggestMonthPlan);
@@ -186,6 +198,30 @@ function bindEvents() {
   els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.tab));
   });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeMenu();
+  });
+}
+
+function toggleMenu() {
+  if (els.appMenu.classList.contains("hidden")) openMenu();
+  else closeMenu();
+}
+
+function openMenu() {
+  els.appMenu.classList.remove("hidden");
+  els.menuOverlay.classList.remove("hidden");
+  els.appMenu.setAttribute("aria-hidden", "false");
+  els.menuButton.setAttribute("aria-expanded", "true");
+  renderAccountMenu();
+}
+
+function closeMenu() {
+  if (!els.appMenu || !els.menuOverlay) return;
+  els.appMenu.classList.add("hidden");
+  els.menuOverlay.classList.add("hidden");
+  els.appMenu.setAttribute("aria-hidden", "true");
+  els.menuButton.setAttribute("aria-expanded", "false");
 }
 
 function setupIcons() {
@@ -442,11 +478,11 @@ async function handleProfileSave(event) {
   const username = normalizeUsername(els.displayNameInput.value);
   const password = els.newPasswordInput.value;
   if (!isValidUsername(username)) {
-    els.authBadge.textContent = "ユーザー名は英数字40文字以内";
+    els.menuStatus.textContent = "ユーザー名は英数字40文字以内";
     return;
   }
   if (password && password.length < 6) {
-    els.authBadge.textContent = "パスワードは6文字以上";
+    els.menuStatus.textContent = "パスワードは6文字以上";
     return;
   }
 
@@ -466,17 +502,18 @@ async function handleProfileSave(event) {
     if (error) throw error;
     state.profile = data || { ...profile, username };
     els.newPasswordInput.value = "";
-    els.authBadge.textContent = username;
     renderAuth();
+    els.menuStatus.textContent = "保存しました。";
   } catch (error) {
     console.error(error);
-    els.authBadge.textContent = "保存失敗";
+    els.menuStatus.textContent = "保存失敗";
   }
 }
 
 async function signOut() {
   if (!supabaseClient) return;
   state.profile = null;
+  closeMenu();
   await supabaseClient.auth.signOut();
 }
 
@@ -588,21 +625,33 @@ function renderMobileNav() {
 function renderAuth() {
   if (!supabaseClient) {
     els.authPanel.classList.add("hidden");
+    renderAccountMenu();
     return;
   }
 
-  els.authPanel.classList.toggle("hidden", !config.REQUIRE_AUTH);
+  els.authPanel.classList.toggle("hidden", !config.REQUIRE_AUTH || Boolean(currentUser));
   els.signOutButton.classList.toggle("hidden", !currentUser);
-  els.usernameInput.classList.toggle("hidden", Boolean(currentUser));
-  els.passwordInput.classList.toggle("hidden", Boolean(currentUser));
-  els.authForm.querySelector("button[type='submit']").classList.toggle("hidden", Boolean(currentUser));
   els.profileForm.classList.toggle("hidden", !currentUser);
   els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser?.email) || "";
-  els.authBadge.textContent = currentUser ? displayUsername() : "未ログイン";
+  els.authBadge.textContent = currentUser ? "" : "未ログイン";
+  renderAccountMenu();
 }
 
 function displayUsername() {
   return state.profile?.username || emailLocalPart(currentUser?.email) || "ログイン済み";
+}
+
+function renderAccountMenu() {
+  if (!els.menuUserName) return;
+  els.menuUserName.textContent = currentUser ? displayUsername() : "未ログイン";
+  els.menuStatus.textContent = currentUser
+    ? "ユーザー名とパスワードを変更できます。"
+    : "ログイン後にアカウント設定を使えます。";
+  els.profileForm.classList.toggle("hidden", !currentUser);
+  els.signOutButton.classList.toggle("hidden", !currentUser);
+  if (currentUser) {
+    els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser.email) || "";
+  }
 }
 
 function renderToday() {
@@ -871,6 +920,80 @@ function parseEbookText() {
   els.ingredientsInput.value = parsed.ingredients.map(formatIngredient).join("\n");
   els.stepsInput.value = parsed.steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
   els.parseResult.textContent = `${parsed.ingredients.length}材料、${parsed.steps.length}行程を抽出しました。`;
+}
+
+async function importPdfFile() {
+  const file = els.pdfInput.files?.[0];
+  if (!file) {
+    els.parseResult.textContent = "PDFファイルを選択してください。";
+    return;
+  }
+  if (file.type && file.type !== "application/pdf") {
+    els.parseResult.textContent = "PDFファイルを選択してください。";
+    return;
+  }
+
+  els.parseResult.textContent = "PDFを読み込んでいます。";
+  try {
+    const text = await extractPdfText(file);
+    if (!text.trim()) {
+      els.parseResult.textContent = "PDFからテキストを抽出できませんでした。";
+      return;
+    }
+    els.ebookInput.value = text;
+    parseEbookText();
+  } catch (error) {
+    console.error(error);
+    els.parseResult.textContent = "PDF読込に失敗しました。";
+  }
+}
+
+async function extractPdfText(file) {
+  await loadPdfLibrary();
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const lines = groupPdfTextItems(content.items || []);
+    pages.push(lines.join("\n"));
+  }
+  return pages.join("\n\n").trim();
+}
+
+async function loadPdfLibrary() {
+  if (window.pdfjsLib) return;
+  const version = "3.11.174";
+  await loadScript(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.min.js`, "pdfjs-lib");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
+}
+
+function groupPdfTextItems(items) {
+  const rows = [];
+  items.forEach((item) => {
+    const value = String(item.str || "").trim();
+    if (!value) return;
+    const y = Math.round((item.transform?.[5] || 0) * 10) / 10;
+    let row = rows.find((entry) => Math.abs(entry.y - y) < 2);
+    if (!row) {
+      row = { y, items: [] };
+      rows.push(row);
+    }
+    row.items.push({ x: item.transform?.[4] || 0, value });
+  });
+
+  return rows
+    .sort((a, b) => b.y - a.y)
+    .map((row) =>
+      row.items
+        .sort((a, b) => a.x - b.x)
+        .map((item) => item.value)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .filter(Boolean);
 }
 
 async function seedSamples() {
