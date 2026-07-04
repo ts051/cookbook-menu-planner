@@ -300,15 +300,28 @@ async function lookupLoginId(username) {
   try {
     const { data, error } = await supabaseClient
       .from("login_ids")
-      .select("auth_email, is_active")
+      .select("auth_email, is_active, user_id")
       .eq("login_id", normalizeUsername(username))
       .maybeSingle();
     if (error) throw error;
-    if (!data) return { email: null, blocked: false };
-    return { email: data.is_active ? data.auth_email : null, blocked: !data.is_active };
+    if (!data) return { email: null, blocked: false, currentLoginId: "" };
+    if (data.is_active) return { email: data.auth_email, blocked: false, currentLoginId: "" };
+
+    const { data: activeRows, error: activeError } = await supabaseClient
+      .from("login_ids")
+      .select("login_id")
+      .eq("user_id", data.user_id)
+      .eq("is_active", true)
+      .limit(1);
+    if (activeError) throw activeError;
+    return {
+      email: null,
+      blocked: true,
+      currentLoginId: activeRows?.[0]?.login_id || ""
+    };
   } catch (error) {
     if (!isMissingLoginIdsTable(error)) console.warn("Login ID lookup failed:", error);
-    return { email: null, blocked: false };
+    return { email: null, blocked: false, currentLoginId: "" };
   }
 }
 
@@ -317,7 +330,12 @@ async function signInWithUsername(username, password) {
   if (!isValidUsername(normalized)) return { error: new Error("Invalid username.") };
 
   const loginId = await lookupLoginId(normalized);
-  if (loginId.blocked) return { error: new Error("Login ID has been changed.") };
+  if (loginId.blocked) {
+    const message = loginId.currentLoginId
+      ? `現在のユーザー名: ${loginId.currentLoginId}`
+      : "ユーザー名が変更済み";
+    return { error: new Error(message) };
+  }
 
   const emails = [loginId.email, usernameToEmail(normalized), usernameToLegacyEmail(normalized)].filter(Boolean);
   let lastError = null;
@@ -400,7 +418,7 @@ async function handleAuthSubmit(event) {
 
   const result = await signInWithUsername(username, password);
   if (result.error) {
-    els.authBadge.textContent = "ログイン失敗";
+    els.authBadge.textContent = result.error.message || "ログイン失敗";
     return;
   }
 
