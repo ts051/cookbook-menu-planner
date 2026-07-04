@@ -77,6 +77,9 @@ button {
   font-size: clamp(1.55rem, 4vw, 2.8rem);
   line-height: 1;
   letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-row,
@@ -91,7 +94,11 @@ button {
 }
 
 .status-row {
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: stretch;
+  align-items: center;
+  width: min(100%, 620px);
 }
 
 .badge {
@@ -112,21 +119,58 @@ button {
 }
 
 .menu-button {
-  min-height: 42px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   border: 1px solid rgba(38, 56, 79, 0.18);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.78);
   color: var(--navy);
-  padding: 0 12px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   font-weight: 800;
 }
 
-.menu-button svg {
+.menu-button-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.hamburger-lines,
+.hamburger-lines::before,
+.hamburger-lines::after {
+  display: block;
   width: 20px;
-  height: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.hamburger-lines {
+  position: relative;
+}
+
+.hamburger-lines::before,
+.hamburger-lines::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.hamburger-lines::before {
+  top: -6px;
+}
+
+.hamburger-lines::after {
+  top: 6px;
 }
 
 .menu-overlay {
@@ -149,7 +193,15 @@ button {
   padding: 18px;
   display: grid;
   align-content: start;
+  justify-items: stretch;
   gap: 16px;
+  text-align: left;
+}
+
+.app-menu,
+.app-menu label,
+.app-menu input,
+.app-menu .menu-status {
   text-align: left;
 }
 
@@ -180,7 +232,7 @@ button {
 }
 
 .app-menu .secondary-button {
-  justify-self: start;
+  justify-self: stretch;
 }
 
 .workspace {
@@ -682,6 +734,7 @@ select:focus {
 
   .status-row {
     flex-wrap: nowrap;
+    width: 100%;
   }
 
   .workspace {
@@ -795,10 +848,6 @@ select:focus {
 }
 
 @media (max-width: 380px) {
-  .menu-button span {
-    display: none;
-  }
-
   .hero h1 {
     font-size: 1.35rem;
   }
