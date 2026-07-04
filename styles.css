@@ -72,11 +72,10 @@ button {
 }
 
 .hero h1 {
-  width: min(640px, 100%);
   margin: 0;
   color: var(--navy);
-  font-size: clamp(2.4rem, 6vw, 4.9rem);
-  line-height: 0.96;
+  font-size: clamp(1.55rem, 4vw, 2.8rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -89,6 +88,10 @@ button {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.status-row {
+  justify-content: flex-start;
 }
 
 .badge {
@@ -136,17 +139,18 @@ button {
 .app-menu {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   bottom: 0;
   z-index: 29;
   width: min(360px, 100%);
   background: #fff;
-  border-left: 1px solid var(--line);
-  box-shadow: -18px 0 48px rgba(31, 41, 51, 0.18);
+  border-right: 1px solid var(--line);
+  box-shadow: 18px 0 48px rgba(31, 41, 51, 0.18);
   padding: 18px;
   display: grid;
   align-content: start;
   gap: 16px;
+  text-align: left;
 }
 
 .menu-header {
@@ -173,6 +177,10 @@ button {
 .menu-form {
   display: grid;
   gap: 12px;
+}
+
+.app-menu .secondary-button {
+  justify-self: start;
 }
 
 .workspace {
@@ -652,7 +660,7 @@ select:focus {
   }
 
   .hero h1 {
-    font-size: 2.25rem;
+    font-size: 1.55rem;
     line-height: 1;
   }
 
@@ -667,13 +675,13 @@ select:focus {
     font-size: 0.84rem;
   }
 
-  .menu-button span {
-    display: none;
-  }
-
   .app-menu {
     width: min(340px, 92vw);
     padding-bottom: 86px;
+  }
+
+  .status-row {
+    flex-wrap: nowrap;
   }
 
   .workspace {
@@ -783,5 +791,15 @@ select:focus {
   .mobile-nav-button.active {
     color: var(--teal);
     background: rgba(35, 122, 118, 0.08);
+  }
+}
+
+@media (max-width: 380px) {
+  .menu-button span {
+    display: none;
+  }
+
+  .hero h1 {
+    font-size: 1.35rem;
   }
 }
