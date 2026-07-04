@@ -11,6 +11,27 @@ const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
 const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
+const iconFallbacks = {
+  "database": "DB",
+  "refresh-cw": "↻",
+  "x": "×",
+  "user-round-pen": "✎",
+  "log-out": "⇱",
+  "key-round": "⚿",
+  "shopping-basket": "▤",
+  "calendar-days": "▦",
+  "eraser": "⌫",
+  "save": "✓",
+  "trash-2": "×",
+  "scan-text": "⌕",
+  "file-text": "PDF",
+  "chevron-left": "‹",
+  "chevron-right": "›",
+  "wand-sparkles": "✦",
+  "pencil": "✎",
+  "utensils": "♨",
+  "book-open": "▥"
+};
 const sampleRecipes = [
   {
     title: "鮭の南蛮漬け",
@@ -228,6 +249,15 @@ function setupIcons() {
   if (window.lucide) {
     window.lucide.createIcons();
   }
+  renderIconFallbacks();
+}
+
+function renderIconFallbacks() {
+  document.querySelectorAll("i[data-lucide]").forEach((icon) => {
+    if (icon.querySelector("svg")) return;
+    icon.classList.add("icon-fallback");
+    icon.textContent = iconFallbacks[icon.dataset.lucide] || "•";
+  });
 }
 
 async function setupStorage() {
@@ -266,6 +296,7 @@ function loadOptionalLucide() {
     .then(setupIcons)
     .catch(() => {
       document.documentElement.classList.add("no-icons");
+      renderIconFallbacks();
     });
 }
 

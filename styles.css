@@ -40,7 +40,7 @@ button {
 
 .hero {
   position: relative;
-  min-height: 320px;
+  min-height: 230px;
   overflow: hidden;
   display: flex;
   align-items: stretch;
@@ -64,11 +64,11 @@ button {
   position: relative;
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 38px 0 54px;
+  padding: 30px 0 32px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 28px;
+  justify-content: flex-start;
+  gap: 14px;
 }
 
 .hero h1 {
@@ -489,6 +489,18 @@ select:focus {
   flex: 0 0 auto;
 }
 
+.icon-fallback {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-style: normal;
+  line-height: 1;
+}
+
 .parse-result {
   min-height: 34px;
   color: var(--muted);
@@ -699,7 +711,7 @@ select:focus {
   }
 
   .hero {
-    min-height: 190px;
+    min-height: 138px;
   }
 
   .hero-overlay {
@@ -707,8 +719,8 @@ select:focus {
   }
 
   .hero-content {
-    padding: 22px 0 34px;
-    gap: 16px;
+    padding: 18px 0 20px;
+    gap: 10px;
   }
 
   .hero h1 {
@@ -762,16 +774,40 @@ select:focus {
     display: block;
   }
 
-  .calendar-grid {
-    grid-template-columns: 1fr;
+  .day-cell {
+    min-height: 58px;
+    padding: 5px;
+    gap: 4px;
   }
 
   .weekday {
-    display: none;
+    min-height: 26px;
+    font-size: 0.68rem;
   }
 
-  .day-cell {
-    min-height: 76px;
+  .day-number {
+    font-size: 0.68rem;
+  }
+
+  .meal-chip {
+    min-height: 28px;
+    padding: 3px;
+    font-size: 0.62rem;
+    line-height: 1.2;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .meal-empty {
+    min-height: 22px;
+    font-size: 0;
+  }
+
+  .meal-empty::before {
+    content: "+";
+    font-size: 0.75rem;
   }
 
   .form-row {
