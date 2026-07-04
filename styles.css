@@ -159,6 +159,73 @@ button {
   align-items: start;
 }
 
+.today-panel {
+  box-shadow: var(--shadow);
+}
+
+.today-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.2fr;
+  gap: 14px;
+}
+
+.today-meal,
+.quick-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.today-meal {
+  display: grid;
+  gap: 8px;
+}
+
+.today-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.today-meal strong {
+  color: var(--navy);
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.quick-list {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+}
+
+.quick-list-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 30px;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.quick-list-item span:last-child {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.quick-list-more {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.mobile-nav {
+  display: none;
+}
+
 .panel {
   padding: 18px;
 }
@@ -486,24 +553,69 @@ select:focus {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .today-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
+  body {
+    padding-bottom: 72px;
+  }
+
   .hero {
-    min-height: 280px;
+    min-height: 190px;
   }
 
   .hero-overlay {
-    background: rgba(251, 250, 247, 0.86);
+    background: rgba(251, 250, 247, 0.9);
+  }
+
+  .hero-content {
+    padding: 22px 0 34px;
+    gap: 16px;
+  }
+
+  .hero h1 {
+    font-size: 2.25rem;
+    line-height: 1;
+  }
+
+  .hero-actions {
+    gap: 8px;
+  }
+
+  .hero-actions .primary-button,
+  .hero-actions .secondary-button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 0.84rem;
   }
 
   .workspace {
     width: min(100% - 20px, 1180px);
-    margin-top: -22px;
+    margin-top: -18px;
+    margin-bottom: 20px;
   }
 
   .panel {
     padding: 14px;
+  }
+
+  .app-view {
+    display: none;
+  }
+
+  body[data-active-view="today"] .app-view[data-view="today"],
+  body[data-active-view="shopping"] .app-view[data-view="shopping"],
+  body[data-active-view="plan"] .app-view[data-view="plan"],
+  body[data-active-view="recipe"] .app-view[data-view="recipe"] {
+    display: block;
+  }
+
+  .dashboard-grid {
+    display: block;
   }
 
   .calendar-grid {
@@ -529,5 +641,60 @@ select:focus {
 
   .search-input {
     max-width: none;
+  }
+
+  .today-grid {
+    gap: 10px;
+  }
+
+  .today-meal strong {
+    font-size: 1.12rem;
+  }
+
+  .quick-list {
+    min-height: 0;
+  }
+
+  .shopping-item {
+    grid-template-columns: 24px 1fr;
+  }
+
+  .item-amount {
+    grid-column: 2;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid rgba(216, 222, 230, 0.96);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -10px 28px rgba(31, 41, 51, 0.12);
+  }
+
+  .mobile-nav-button {
+    min-height: 62px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    font-size: 0.74rem;
+    font-weight: 800;
+  }
+
+  .mobile-nav-button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-nav-button.active {
+    color: var(--teal);
+    background: rgba(35, 122, 118, 0.08);
   }
 }

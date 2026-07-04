@@ -91,6 +91,7 @@ let state = {
   plan: [],
   checks: {},
   profile: null,
+  activeView: "today",
   monthCursor: startOfMonth(new Date()),
   weekCursor: startOfWeek(new Date())
 };
@@ -114,6 +115,14 @@ function bindElements() {
     "authBadge",
     "authPanel",
     "authForm",
+    "todayDateLabel",
+    "todayMealTitle",
+    "todayMealMeta",
+    "todayIngredients",
+    "todayShopping",
+    "todayOpenShopping",
+    "todayOpenPlan",
+    "mobileNav",
     "usernameInput",
     "passwordInput",
     "profileForm",
@@ -172,6 +181,11 @@ function bindEvents() {
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
   els.searchInput.addEventListener("input", renderRecipeList);
+  els.todayOpenShopping.addEventListener("click", () => switchView("shopping"));
+  els.todayOpenPlan.addEventListener("click", () => switchView("plan"));
+  els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
+    button.addEventListener("click", () => switchView(button.dataset.tab));
+  });
 }
 
 function setupIcons() {
@@ -527,12 +541,30 @@ function saveLocal() {
 
 function render() {
   renderAuth();
+  renderToday();
+  renderMobileNav();
   renderRecipeFormState();
   renderRecipeSelect();
   renderCalendar();
   renderShoppingList();
   renderRecipeList();
   setupIcons();
+}
+
+function switchView(view) {
+  if (!["today", "shopping", "plan", "recipe"].includes(view)) return;
+  state.activeView = view;
+  renderMobileNav();
+  document.body.dataset.activeView = view;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderMobileNav() {
+  document.body.dataset.activeView = state.activeView;
+  if (!els.mobileNav) return;
+  els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === state.activeView);
+  });
 }
 
 function renderAuth() {
@@ -553,6 +585,62 @@ function renderAuth() {
 
 function displayUsername() {
   return state.profile?.username || emailLocalPart(currentUser?.email) || "ログイン済み";
+}
+
+function renderToday() {
+  const today = new Date();
+  const todayISO = toISODate(today);
+  const weekStart = startOfWeek(today);
+  const todayEntry = state.plan.find((item) => item.plan_date === todayISO && item.meal_slot === "dinner");
+  const recipe = todayEntry ? state.recipes.find((item) => item.id === todayEntry.recipe_id) : null;
+
+  els.todayDateLabel.textContent = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+  els.todayMealTitle.textContent = recipe?.title || "未定";
+  els.todayMealMeta.textContent = recipe
+    ? [recipe.source_title, `${recipe.servings || 2}人分`].filter(Boolean).join(" / ")
+    : "献立タブで今日の料理を選べます。";
+
+  const ingredients = recipe?.ingredients || [];
+  renderQuickList(
+    els.todayIngredients,
+    ingredients.slice(0, 6).map((item) => ({
+      name: item.name,
+      amount: formatIngredientAmount(item)
+    })),
+    "材料はまだありません。",
+    ingredients.length > 6 ? `ほか${ingredients.length - 6}件` : ""
+  );
+
+  const shopping = getShoppingItemsForDates(weekStart, new Set([todayISO]))
+    .filter((item) => !state.checks[item.key])
+    .slice(0, 6)
+    .map((item) => ({ name: item.name, amount: item.amount }));
+  renderQuickList(els.todayShopping, shopping, "買うものはまだありません。");
+}
+
+function renderQuickList(container, items, emptyText, footerText = "") {
+  container.innerHTML = "";
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-state">${escapeHTML(emptyText)}</div>`;
+    return;
+  }
+
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "quick-list-item";
+    row.innerHTML = `
+      <span>${escapeHTML(item.name)}</span>
+      <span>${escapeHTML(item.amount || "")}</span>
+    `;
+    container.append(row);
+  });
+
+  if (footerText) {
+    const footer = document.createElement("div");
+    footer.className = "quick-list-more";
+    footer.textContent = footerText;
+    container.append(footer);
+  }
 }
 
 function renderRecipeFormState() {
@@ -882,11 +970,16 @@ async function toggleShoppingCheck(key, checked) {
   }
 
   renderShoppingList();
+  renderToday();
 }
 
 function getShoppingItems(weekStart) {
   const weekDates = new Set(Array.from({ length: 7 }, (_, index) => toISODate(addDays(weekStart, index))));
-  const entries = state.plan.filter((entry) => weekDates.has(entry.plan_date));
+  return getShoppingItemsForDates(weekStart, weekDates);
+}
+
+function getShoppingItemsForDates(weekStart, dates) {
+  const entries = state.plan.filter((entry) => dates.has(entry.plan_date));
   const bucket = new Map();
 
   entries.forEach((entry) => {
@@ -915,6 +1008,12 @@ function getShoppingItems(weekStart) {
       amount: item.quantity ? `${roundQuantity(item.quantity)}${item.unit}` : item.raw.join(" / ")
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
+function formatIngredientAmount(ingredient) {
+  if (!ingredient) return "";
+  const quantity = typeof ingredient.quantity === "number" ? roundQuantity(ingredient.quantity) : "";
+  return [quantity ? `${quantity}${ingredient.unit || ""}` : "", ingredient.note].filter(Boolean).join(" ");
 }
 
 function parseRecipeText(text) {

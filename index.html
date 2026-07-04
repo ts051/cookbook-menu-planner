@@ -60,8 +60,42 @@
           </form>
         </section>
 
+        <section id="todayPanel" class="panel today-panel app-view" data-view="today">
+          <div class="panel-heading">
+            <div>
+              <h2>今日の確認</h2>
+              <span id="todayDateLabel" class="subtle"></span>
+            </div>
+            <div class="compact-actions">
+              <button id="todayOpenShopping" class="secondary-button" type="button">
+                <i data-lucide="shopping-basket"></i>
+                買い物
+              </button>
+              <button id="todayOpenPlan" class="secondary-button" type="button">
+                <i data-lucide="calendar-days"></i>
+                献立
+              </button>
+            </div>
+          </div>
+          <div class="today-grid">
+            <div class="today-meal">
+              <span class="today-label">作るもの</span>
+              <strong id="todayMealTitle">未定</strong>
+              <span id="todayMealMeta" class="subtle"></span>
+            </div>
+            <div>
+              <span class="today-label">材料</span>
+              <div id="todayIngredients" class="quick-list"></div>
+            </div>
+            <div>
+              <span class="today-label">買うもの</span>
+              <div id="todayShopping" class="quick-list"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="dashboard-grid">
-          <div class="panel recipe-panel">
+          <div class="panel recipe-panel app-view" data-view="recipe">
             <div class="panel-heading">
               <div>
                 <h2>レシピDB</h2>
@@ -113,7 +147,7 @@
             </form>
           </div>
 
-          <div class="panel import-panel">
+          <div class="panel import-panel app-view" data-view="recipe">
             <div class="panel-heading">
               <div>
                 <h2>電子書籍テキスト</h2>
@@ -127,7 +161,7 @@
             <div id="parseResult" class="parse-result"></div>
           </div>
 
-          <div class="panel plan-panel">
+          <div class="panel plan-panel app-view" data-view="plan">
             <div class="panel-heading">
               <div>
                 <h2>月間献立</h2>
@@ -152,7 +186,7 @@
             <div id="calendarGrid" class="calendar-grid"></div>
           </div>
 
-          <div class="panel list-panel">
+          <div class="panel list-panel app-view" data-view="shopping">
             <div class="panel-heading">
               <div>
                 <h2>買い物リスト</h2>
@@ -171,7 +205,7 @@
           </div>
         </section>
 
-        <section class="panel recipe-list-panel">
+        <section class="panel recipe-list-panel app-view" data-view="recipe">
           <div class="panel-heading">
             <div>
               <h2>登録済みレシピ</h2>
@@ -182,6 +216,24 @@
           <div id="recipeList" class="recipe-list"></div>
         </section>
       </main>
+      <nav id="mobileNav" class="mobile-nav" aria-label="主要メニュー">
+        <button class="mobile-nav-button active" type="button" data-tab="today">
+          <i data-lucide="utensils"></i>
+          今日
+        </button>
+        <button class="mobile-nav-button" type="button" data-tab="shopping">
+          <i data-lucide="shopping-basket"></i>
+          買い物
+        </button>
+        <button class="mobile-nav-button" type="button" data-tab="plan">
+          <i data-lucide="calendar-days"></i>
+          献立
+        </button>
+        <button class="mobile-nav-button" type="button" data-tab="recipe">
+          <i data-lucide="book-open"></i>
+          レシピ
+        </button>
+      </nav>
     </div>
   </body>
 </html>
