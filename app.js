@@ -9,7 +9,7 @@ const isConfigured = Boolean(
 const STORAGE_KEY = "cookbook-menu-planner:v1";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
-const USERNAME_PATTERN = /^[a-z0-9._-]{3,40}$/;
+const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
 const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
 const sampleRecipes = [
   {
@@ -412,7 +412,7 @@ async function handleAuthSubmit(event) {
   const username = normalizeUsername(els.usernameInput.value);
   const password = els.passwordInput.value;
   if (!isValidUsername(username) || !password) {
-    els.authBadge.textContent = "入力を確認";
+    els.authBadge.textContent = "ユーザー名またはパスワード未入力";
     return;
   }
 
@@ -442,7 +442,7 @@ async function handleProfileSave(event) {
   const username = normalizeUsername(els.displayNameInput.value);
   const password = els.newPasswordInput.value;
   if (!isValidUsername(username)) {
-    els.authBadge.textContent = "英数字のユーザー名にしてください";
+    els.authBadge.textContent = "ユーザー名は英数字40文字以内";
     return;
   }
   if (password && password.length < 6) {

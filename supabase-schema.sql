@@ -39,7 +39,7 @@ create table if not exists public.profiles (
   username text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint profiles_username_length check (char_length(username) between 3 and 40)
+  constraint profiles_username_length check (char_length(username) between 1 and 40)
 );
 
 create table if not exists public.login_ids (
@@ -49,7 +49,7 @@ create table if not exists public.login_ids (
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint login_ids_login_id_format check (login_id ~ '^[a-z0-9._-]{3,40}$')
+  constraint login_ids_login_id_format check (login_id ~ '^[a-z0-9._-]{1,40}$')
 );
 
 create or replace function public.set_updated_at()
