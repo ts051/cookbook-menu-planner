@@ -1,0 +1,23 @@
+{
+  "name": "Cookbook Menu Planner",
+  "short_name": "Cookbook",
+  "start_url": "/cookbook-menu-planner/",
+  "scope": "/cookbook-menu-planner/",
+  "display": "standalone",
+  "background_color": "#f4eadb",
+  "theme_color": "#f4eadb",
+  "icons": [
+    {
+      "src": "/cookbook-menu-planner/assets/cookbook-menu-planner-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/cookbook-menu-planner/assets/cookbook-menu-planner-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
