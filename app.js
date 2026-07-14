@@ -7,6 +7,7 @@ const isConfigured = Boolean(
 );
 
 const STORAGE_KEY = "cookbook-menu-planner:v1";
+const SHOPPING_ORDER_STORAGE_KEY = "cookbook-menu-planner-shopping-order:v1";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
@@ -111,6 +112,7 @@ let state = {
   recipes: [],
   plan: [],
   checks: {},
+  shoppingOrders: {},
   profile: null,
   activeView: "today",
   monthCursor: startOfMonth(new Date()),
@@ -125,6 +127,7 @@ async function init() {
   bindElements();
   bindEvents();
   await setupStorage();
+  loadShoppingOrders();
   await loadAll();
   render();
   window.addEventListener("load", loadOptionalLucide, { once: true });
@@ -146,9 +149,7 @@ function bindElements() {
     "todayMealTitle",
     "todayMealMeta",
     "todayIngredients",
-    "todayShopping",
-    "todayOpenShopping",
-    "todayOpenPlan",
+    "todaySteps",
     "mobileNav",
     "usernameInput",
     "passwordInput",
@@ -214,8 +215,6 @@ function bindEvents() {
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
   els.searchInput.addEventListener("input", renderRecipeList);
-  els.todayOpenShopping.addEventListener("click", () => switchView("shopping"));
-  els.todayOpenPlan.addEventListener("click", () => switchView("plan"));
   els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.tab));
   });
@@ -286,6 +285,7 @@ async function setupStorage() {
 
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     currentUser = session?.user || null;
+    loadShoppingOrders();
     await loadAll();
     render();
   });
@@ -625,6 +625,22 @@ function saveLocal() {
   );
 }
 
+function shoppingOrderStorageKey() {
+  return `${SHOPPING_ORDER_STORAGE_KEY}:${currentUser?.id || "local"}`;
+}
+
+function loadShoppingOrders() {
+  try {
+    state.shoppingOrders = JSON.parse(localStorage.getItem(shoppingOrderStorageKey()) || "{}") || {};
+  } catch {
+    state.shoppingOrders = {};
+  }
+}
+
+function saveShoppingOrders() {
+  localStorage.setItem(shoppingOrderStorageKey(), JSON.stringify(state.shoppingOrders));
+}
+
 function render() {
   renderAuth();
   renderToday();
@@ -688,7 +704,6 @@ function renderAccountMenu() {
 function renderToday() {
   const today = new Date();
   const todayISO = toISODate(today);
-  const weekStart = startOfWeek(today);
   const todayEntry = state.plan.find((item) => item.plan_date === todayISO && item.meal_slot === "dinner");
   const recipe = todayEntry ? state.recipes.find((item) => item.id === todayEntry.recipe_id) : null;
 
@@ -701,19 +716,19 @@ function renderToday() {
   const ingredients = recipe?.ingredients || [];
   renderQuickList(
     els.todayIngredients,
-    ingredients.slice(0, 6).map((item) => ({
+    ingredients.map((item) => ({
       name: item.name,
       amount: formatIngredientAmount(item)
     })),
-    "材料はまだありません。",
-    ingredients.length > 6 ? `ほか${ingredients.length - 6}件` : ""
+    "材料はまだありません。"
   );
 
-  const shopping = getShoppingItemsForDates(weekStart, new Set([todayISO]))
-    .filter((item) => !state.checks[item.key])
-    .slice(0, 6)
-    .map((item) => ({ name: item.name, amount: item.amount }));
-  renderQuickList(els.todayShopping, shopping, "買うものはまだありません。");
+  const steps = recipe?.steps || [];
+  renderQuickList(
+    els.todaySteps,
+    steps.map((step, index) => ({ name: `${index + 1}. ${step}`, amount: "" })),
+    "作り方はまだありません。"
+  );
 }
 
 function renderQuickList(container, items, emptyText, footerText = "") {
@@ -810,25 +825,59 @@ function renderShoppingList() {
   els.weekLabel.textContent = `${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}`;
   els.shoppingList.innerHTML = "";
 
-  const items = getShoppingItems(weekStart);
+  const items = getOrderedShoppingItems(weekStart);
   if (!items.length) {
     els.shoppingList.innerHTML = `<div class="empty-state">この週の献立は未登録です。</div>`;
     return;
   }
 
-  items.forEach((item) => {
-    const row = document.createElement("label");
+  items.forEach((item, index) => {
+    const row = document.createElement("div");
     row.className = `shopping-item ${state.checks[item.key] ? "checked" : ""}`;
     row.innerHTML = `
-      <input type="checkbox" ${state.checks[item.key] ? "checked" : ""} />
+      <input type="checkbox" aria-label="${escapeHTML(item.name)}を購入済みにする" ${state.checks[item.key] ? "checked" : ""} />
       <span class="item-name">${escapeHTML(item.name)}</span>
       <span class="item-amount">${escapeHTML(item.amount)}</span>
+      <span class="shopping-order-actions">
+        <button class="order-button" type="button" aria-label="${escapeHTML(item.name)}を上へ移動" title="上へ" ${index === 0 ? "disabled" : ""}>↑</button>
+        <button class="order-button" type="button" aria-label="${escapeHTML(item.name)}を下へ移動" title="下へ" ${index === items.length - 1 ? "disabled" : ""}>↓</button>
+      </span>
     `;
     row.querySelector("input").addEventListener("change", (event) => {
       toggleShoppingCheck(item.key, event.target.checked);
     });
+    const [upButton, downButton] = row.querySelectorAll(".order-button");
+    upButton.addEventListener("click", () => moveShoppingItem(index, -1));
+    downButton.addEventListener("click", () => moveShoppingItem(index, 1));
     els.shoppingList.append(row);
   });
+}
+
+function getOrderedShoppingItems(weekStart) {
+  const items = getShoppingItems(weekStart);
+  const weekKey = toISODate(weekStart);
+  const savedOrder = state.shoppingOrders[weekKey] || [];
+  const positions = new Map(savedOrder.map((key, index) => [key, index]));
+
+  return items
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      const aPosition = positions.has(a.item.key) ? positions.get(a.item.key) : savedOrder.length + a.originalIndex;
+      const bPosition = positions.has(b.item.key) ? positions.get(b.item.key) : savedOrder.length + b.originalIndex;
+      return aPosition - bPosition;
+    })
+    .map(({ item }) => item);
+}
+
+function moveShoppingItem(index, delta) {
+  const items = getOrderedShoppingItems(state.weekCursor);
+  const targetIndex = index + delta;
+  if (targetIndex < 0 || targetIndex >= items.length) return;
+
+  [items[index], items[targetIndex]] = [items[targetIndex], items[index]];
+  state.shoppingOrders[toISODate(state.weekCursor)] = items.map((item) => item.key);
+  saveShoppingOrders();
+  renderShoppingList();
 }
 
 function renderRecipeList() {

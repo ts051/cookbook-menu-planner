@@ -595,7 +595,7 @@ select:focus {
 
 .shopping-item {
   display: grid;
-  grid-template-columns: 24px 1fr auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
@@ -621,6 +621,27 @@ select:focus {
 .item-amount {
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.shopping-order-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.order-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--navy);
+  font-weight: 900;
+}
+
+.order-button:disabled {
+  cursor: default;
+  opacity: 0.3;
 }
 
 .recipe-list-panel {
@@ -819,6 +840,20 @@ select:focus {
     flex-direction: column;
   }
 
+  .shopping-heading {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .shopping-heading > :first-child {
+    min-width: 0;
+  }
+
+  .shopping-heading .compact-actions {
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+
   .search-input {
     max-width: none;
   }
@@ -840,11 +875,16 @@ select:focus {
   }
 
   .shopping-item {
-    grid-template-columns: 24px 1fr;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
   }
 
   .item-amount {
     grid-column: 2;
+  }
+
+  .shopping-order-actions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 
   .mobile-nav {
@@ -861,13 +901,13 @@ select:focus {
   }
 
   .mobile-nav-button {
-    min-height: 62px;
+    min-height: 52px;
     border: 0;
     background: transparent;
     color: var(--muted);
-    display: grid;
-    place-items: center;
-    gap: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 0.74rem;
     font-weight: 800;
   }
