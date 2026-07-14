@@ -8,9 +8,9 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=icons-20260708" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260714-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-3" />
     <script src="./supabase-config.js"></script>
-    <script defer src="./app.js?v=20260714-2"></script>
+    <script defer src="./app.js?v=20260714-3"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -25,16 +25,6 @@
             </button>
             <h1>きょうのこんだて</h1>
             <span id="storageBadge" class="hidden">Local</span>
-          </div>
-          <div class="hero-actions">
-            <button id="seedButton" class="primary-button" type="button">
-              <i data-lucide="database"></i>
-              サンプル投入
-            </button>
-            <button id="syncButton" class="secondary-button" type="button">
-              <i data-lucide="refresh-cw"></i>
-              再読込
-            </button>
           </div>
         </div>
       </header>
@@ -51,6 +41,10 @@
           </button>
         </div>
         <div id="menuStatus" class="menu-status"></div>
+        <div class="menu-actions">
+          <button id="seedButton" class="secondary-button" type="button">DBサンプル投入</button>
+          <button id="syncButton" class="secondary-button" type="button">再読込</button>
+        </div>
         <form id="profileForm" class="menu-form hidden">
           <label>
             ユーザー名
@@ -61,12 +55,10 @@
             <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="変更しない場合は空欄" />
           </label>
           <button class="secondary-button" type="submit">
-            <i data-lucide="user-round-pen"></i>
             保存
           </button>
         </form>
         <button id="signOutButton" class="secondary-button hidden" type="button">
-          <i data-lucide="log-out"></i>
           ログアウト
         </button>
       </aside>
@@ -119,9 +111,7 @@
                 <h2>レシピDB</h2>
                 <span id="recipeCount" class="subtle"></span>
               </div>
-              <button id="clearFormButton" class="icon-button" type="button" title="フォームを空にする">
-                <i data-lucide="eraser"></i>
-              </button>
+              <button id="clearFormButton" class="secondary-button" type="button">クリア</button>
             </div>
 
             <form id="recipeForm" class="recipe-form">
@@ -154,7 +144,6 @@
               </label>
               <div class="form-actions">
                 <button class="primary-button" type="submit">
-                  <i data-lucide="save"></i>
                   保存
                 </button>
                 <button id="deleteRecipeButton" class="danger-button hidden" type="button">
@@ -171,14 +160,11 @@
                 <h2>電子書籍テキスト</h2>
                 <span class="subtle">材料 / 作り方 見出しに対応</span>
               </div>
-              <button id="parseButton" class="icon-button" type="button" title="テキストから抽出">
-                <i data-lucide="scan-text"></i>
-              </button>
+              <button id="parseButton" class="secondary-button" type="button">テキストから抽出</button>
             </div>
             <div class="file-import-row">
               <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
               <button id="pdfImportButton" class="secondary-button" type="button">
-                <i data-lucide="file-text"></i>
                 PDF読込
               </button>
             </div>
@@ -187,7 +173,7 @@
           </div>
 
           <div class="panel plan-panel app-view" data-view="plan">
-            <div class="panel-heading">
+            <div class="panel-heading plan-heading">
               <div>
                 <h2>月間献立</h2>
                 <span id="monthLabel" class="subtle"></span>
@@ -203,7 +189,6 @@
             </div>
             <div class="plan-tools">
               <button id="suggestMonthButton" class="primary-button" type="button">
-                <i data-lucide="wand-sparkles"></i>
                 今月を提案
               </button>
               <select id="recipeSelect" aria-label="献立に入れるレシピ"></select>

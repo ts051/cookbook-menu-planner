@@ -40,7 +40,7 @@ button {
 
 .hero {
   position: relative;
-  min-height: 230px;
+  min-height: 150px;
   overflow: hidden;
   display: flex;
   align-items: stretch;
@@ -83,7 +83,6 @@ button {
 }
 
 .status-row,
-.hero-actions,
 .compact-actions,
 .form-actions,
 .plan-tools {
@@ -229,6 +228,11 @@ button {
 .menu-form {
   display: grid;
   gap: 12px;
+}
+
+.menu-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .app-menu .secondary-button {
@@ -732,7 +736,7 @@ select:focus {
   }
 
   .hero {
-    min-height: 138px;
+    min-height: 96px;
   }
 
   .hero-overlay {
@@ -747,17 +751,6 @@ select:focus {
   .hero h1 {
     font-size: 1.55rem;
     line-height: 1;
-  }
-
-  .hero-actions {
-    gap: 8px;
-  }
-
-  .hero-actions .primary-button,
-  .hero-actions .secondary-button {
-    min-height: 36px;
-    padding: 0 10px;
-    font-size: 0.84rem;
   }
 
   .app-menu {
@@ -840,15 +833,18 @@ select:focus {
     flex-direction: column;
   }
 
+  .plan-heading,
   .shopping-heading {
     align-items: flex-start;
     flex-direction: row;
   }
 
+  .plan-heading > :first-child,
   .shopping-heading > :first-child {
     min-width: 0;
   }
 
+  .plan-heading .compact-actions,
   .shopping-heading .compact-actions {
     flex-wrap: nowrap;
     margin-left: auto;

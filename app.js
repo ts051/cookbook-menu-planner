@@ -908,7 +908,6 @@ function renderRecipeList() {
         ${(recipe.tags || []).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
       </div>
       <button class="secondary-button" type="button">
-        <i data-lucide="pencil"></i>
         編集
       </button>
     `;
