@@ -273,7 +273,7 @@ async function setupStorage() {
     console.error(error);
     els.storageBadge.textContent = "Local";
     els.authBadge.textContent = "Supabase読込失敗";
-    els.authPanel.classList.add("hidden");
+    els.authPanel.classList.remove("hidden");
     return;
   }
 
