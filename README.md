@@ -13,7 +13,7 @@ Supabase未設定でもローカル保存で動作します。公開版では `s
 
 ## Supabase設定
 
-1. SQL Editorで `supabase-schema.sql` を実行します。
+1. SQL Editorで `supabase-schema.sql` を実行します。既存環境を更新する場合も、ラベル用テーブルと列を追加するため再実行してください。
 2. Authentication > Providers > Emailで公開サインアップを無効にします。
 3. Authentication > URL ConfigurationにGitHub PagesのURLを追加します。
 4. `supabase-config.js` にProject URLとpublishable keyを設定します。

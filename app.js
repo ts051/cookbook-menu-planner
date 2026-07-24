@@ -11,6 +11,7 @@ const SHOPPING_ORDER_STORAGE_KEY = "cookbook-menu-planner-shopping-order:v1";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
+const MAX_LABELS = 10;
 const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
 const iconFallbacks = {
   "database": "DB",
@@ -38,7 +39,8 @@ const sampleRecipes = [
     title: "鮭の南蛮漬け",
     source_title: "和食の基本 p.42",
     servings: 2,
-    tags: ["和食", "魚", "作り置き"],
+    tags: ["主菜"],
+    label: "",
     ingredients: [
       parseIngredientLine("鮭 2切れ"),
       parseIngredientLine("玉ねぎ 1/2個"),
@@ -52,7 +54,8 @@ const sampleRecipes = [
     title: "鶏と長ねぎの照り焼き",
     source_title: "毎日の定番 p.18",
     servings: 2,
-    tags: ["鶏肉", "主菜", "弁当"],
+    tags: ["主菜"],
+    label: "",
     ingredients: [
       parseIngredientLine("鶏もも肉 300g"),
       parseIngredientLine("長ねぎ 1本"),
@@ -66,7 +69,8 @@ const sampleRecipes = [
     title: "なすとトマトの味噌炒め",
     source_title: "野菜のおかず p.73",
     servings: 2,
-    tags: ["野菜", "味噌", "時短"],
+    tags: ["主菜"],
+    label: "",
     ingredients: [
       parseIngredientLine("なす 3本"),
       parseIngredientLine("トマト 1個"),
@@ -80,7 +84,8 @@ const sampleRecipes = [
     title: "豆腐ときのこの卵とじ",
     source_title: "軽い夕食 p.29",
     servings: 2,
-    tags: ["豆腐", "卵", "節約"],
+    tags: ["副菜"],
+    label: "",
     ingredients: [
       parseIngredientLine("木綿豆腐 1丁"),
       parseIngredientLine("しめじ 1袋"),
@@ -94,7 +99,8 @@ const sampleRecipes = [
     title: "キャベツと豚肉の蒸し煮",
     source_title: "春野菜 p.11",
     servings: 2,
-    tags: ["豚肉", "野菜", "蒸し料理"],
+    tags: ["主菜"],
+    label: "",
     ingredients: [
       parseIngredientLine("キャベツ 1/4玉"),
       parseIngredientLine("豚バラ肉 180g"),
@@ -113,6 +119,7 @@ let state = {
   plan: [],
   checks: {},
   shoppingOrders: {},
+  labels: [],
   profile: null,
   activeView: "today",
   monthCursor: startOfMonth(new Date()),
@@ -159,6 +166,7 @@ function bindElements() {
     "signOutButton",
     "seedButton",
     "syncButton",
+    "labelSettingsButton",
     "recipeCount",
     "recipeForm",
     "recipeId",
@@ -166,6 +174,7 @@ function bindElements() {
     "sourceInput",
     "servingsInput",
     "tagsInput",
+    "recipeLabelInput",
     "ingredientsInput",
     "stepsInput",
     "clearFormButton",
@@ -185,7 +194,15 @@ function bindElements() {
     "prevWeekButton",
     "nextWeekButton",
     "shoppingList",
-    "searchInput",
+    "tagFilter",
+    "labelFilter",
+    "labelForm",
+    "labelNameInput",
+    "addLabelButton",
+    "labelCount",
+    "labelMessage",
+    "labelList",
+    "closeLabelSettingsButton",
     "recipeList"
   ].forEach((id) => {
     els[id] = document.getElementById(id);
@@ -204,6 +221,10 @@ function bindEvents() {
     await loadAll();
     render();
   });
+  els.labelSettingsButton.addEventListener("click", () => {
+    closeMenu();
+    switchView("labels");
+  });
   els.recipeForm.addEventListener("submit", handleRecipeSave);
   els.clearFormButton.addEventListener("click", clearRecipeForm);
   els.deleteRecipeButton.addEventListener("click", deleteSelectedRecipe);
@@ -214,7 +235,10 @@ function bindEvents() {
   els.suggestMonthButton.addEventListener("click", suggestMonthPlan);
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
-  els.searchInput.addEventListener("input", renderRecipeList);
+  els.tagFilter.addEventListener("change", renderRecipeList);
+  els.labelFilter.addEventListener("change", renderRecipeList);
+  els.labelForm.addEventListener("submit", addLabel);
+  els.closeLabelSettingsButton.addEventListener("click", () => switchView("recipe"));
   els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.tab));
   });
@@ -565,13 +589,15 @@ async function loadRemote() {
     { data: recipes, error: recipesError },
     { data: plan, error: planError },
     { data: checks, error: checksError },
-    { data: profile, error: profileError }
+    { data: profile, error: profileError },
+    { data: labels, error: labelsError }
   ] =
     await Promise.all([
       supabaseClient.from("recipes").select("*").order("created_at", { ascending: false }),
       supabaseClient.from("meal_plan_entries").select("*").order("plan_date", { ascending: true }),
       supabaseClient.from("shopping_checks").select("*"),
-      supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle()
+      supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle(),
+      supabaseClient.from("user_labels").select("*").order("position", { ascending: true }).order("created_at", { ascending: true })
     ]);
 
   if (recipesError || planError || checksError || profileError) {
@@ -579,10 +605,12 @@ async function loadRemote() {
     loadLocal();
     return;
   }
+  if (labelsError) console.warn(labelsError);
 
   state.recipes = recipes || [];
   state.plan = plan || [];
   state.checks = Object.fromEntries((checks || []).map((item) => [item.item_key, item.checked]));
+  state.labels = labelsError ? [] : (labels || []).map((item) => ({ id: item.id, name: item.name }));
   state.profile = profile || (currentUser ? await ensureProfile(currentUser, emailLocalPart(currentUser.email)) : null);
   if (currentUser && state.profile?.username) {
     await replaceLoginId(currentUser, state.profile.username, false);
@@ -595,6 +623,7 @@ function loadLocal() {
     state.recipes = [];
     state.plan = [];
     state.checks = {};
+    state.labels = [];
     state.profile = null;
     return;
   }
@@ -604,11 +633,13 @@ function loadLocal() {
     state.recipes = saved.recipes || [];
     state.plan = saved.plan || [];
     state.checks = saved.checks || {};
+    state.labels = saved.labels || [];
     state.profile = saved.profile || null;
   } catch {
     state.recipes = [];
     state.plan = [];
     state.checks = {};
+    state.labels = [];
     state.profile = null;
   }
 }
@@ -620,6 +651,7 @@ function saveLocal() {
       recipes: state.recipes,
       plan: state.plan,
       checks: state.checks,
+      labels: state.labels,
       profile: state.profile
     })
   );
@@ -646,15 +678,17 @@ function render() {
   renderToday();
   renderMobileNav();
   renderRecipeFormState();
+  renderLabelControls();
   renderRecipeSelect();
   renderCalendar();
   renderShoppingList();
   renderRecipeList();
+  renderLabelSettings();
   setupIcons();
 }
 
 function switchView(view) {
-  if (!["today", "shopping", "plan", "recipe"].includes(view)) return;
+  if (!["today", "shopping", "plan", "recipe", "labels"].includes(view)) return;
   state.activeView = view;
   renderMobileNav();
   document.body.dataset.activeView = view;
@@ -667,6 +701,24 @@ function renderMobileNav() {
   els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === state.activeView);
   });
+}
+
+function renderLabelControls() {
+  const selectedRecipeLabel = els.recipeLabelInput.value;
+  const selectedFilter = els.labelFilter.value;
+  const options = state.labels
+    .map((label) => `<option value="${escapeHTML(label.name)}">${escapeHTML(label.name)}</option>`)
+    .join("");
+
+  els.recipeLabelInput.innerHTML = `<option value="">ラベルなし</option>${options}`;
+  els.labelFilter.innerHTML = `<option value="">すべてのラベル</option>${options}`;
+
+  if (state.labels.some((label) => label.name === selectedRecipeLabel)) {
+    els.recipeLabelInput.value = selectedRecipeLabel;
+  }
+  if (state.labels.some((label) => label.name === selectedFilter)) {
+    els.labelFilter.value = selectedFilter;
+  }
 }
 
 function renderAuth() {
@@ -881,10 +933,12 @@ function moveShoppingItem(index, delta) {
 }
 
 function renderRecipeList() {
-  const query = els.searchInput.value.trim().toLowerCase();
+  const selectedTag = els.tagFilter.value;
+  const selectedLabel = els.labelFilter.value;
   const recipes = state.recipes.filter((recipe) => {
-    const haystack = [recipe.title, recipe.source_title, ...(recipe.tags || [])].join(" ").toLowerCase();
-    return haystack.includes(query);
+    const matchesTag = !selectedTag || (recipe.tags || []).includes(selectedTag);
+    const matchesLabel = !selectedLabel || recipe.label === selectedLabel;
+    return matchesTag && matchesLabel;
   });
 
   els.recipeList.innerHTML = "";
@@ -906,6 +960,7 @@ function renderRecipeList() {
       </div>
       <div class="tag-row">
         ${(recipe.tags || []).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
+        ${recipe.label ? `<span class="label">${escapeHTML(recipe.label)}</span>` : ""}
       </div>
       <button class="secondary-button" type="button">
         編集
@@ -924,7 +979,8 @@ async function handleRecipeSave(event) {
     title: els.titleInput.value.trim(),
     source_title: els.sourceInput.value.trim(),
     servings: Number(els.servingsInput.value) || 2,
-    tags: splitLinesOrComma(els.tagsInput.value),
+    tags: els.tagsInput.value ? [els.tagsInput.value] : [],
+    label: els.recipeLabelInput.value,
     ingredients: splitLines(els.ingredientsInput.value).map(parseIngredientLine),
     steps: splitLines(els.stepsInput.value).map((step) => step.replace(/^\d+[.)、]\s*/, "")),
     notes: ""
@@ -956,7 +1012,8 @@ function fillRecipeForm(recipe) {
   els.titleInput.value = recipe.title || "";
   els.sourceInput.value = recipe.source_title || "";
   els.servingsInput.value = recipe.servings || 2;
-  els.tagsInput.value = (recipe.tags || []).join(", ");
+  els.tagsInput.value = (recipe.tags || []).find((tag) => tag === "主菜" || tag === "副菜") || "";
+  els.recipeLabelInput.value = recipe.label || "";
   els.ingredientsInput.value = (recipe.ingredients || []).map(formatIngredient).join("\n");
   els.stepsInput.value = (recipe.steps || []).map((step, index) => `${index + 1}. ${step}`).join("\n");
   els.deleteRecipeButton.classList.remove("hidden");
@@ -966,7 +1023,97 @@ function clearRecipeForm() {
   els.recipeForm.reset();
   els.recipeId.value = "";
   els.servingsInput.value = 2;
+  els.tagsInput.value = "";
+  els.recipeLabelInput.value = "";
   els.deleteRecipeButton.classList.add("hidden");
+}
+
+function renderLabelSettings() {
+  els.labelCount.textContent = `${state.labels.length} / ${MAX_LABELS}件`;
+  els.addLabelButton.disabled = state.labels.length >= MAX_LABELS;
+  els.labelNameInput.disabled = state.labels.length >= MAX_LABELS;
+  els.labelList.innerHTML = "";
+
+  if (!state.labels.length) {
+    els.labelList.innerHTML = `<div class="empty-state">ラベルはまだありません。</div>`;
+    return;
+  }
+
+  state.labels.forEach((label) => {
+    const row = document.createElement("div");
+    row.className = "label-list-item";
+    row.innerHTML = `
+      <span>${escapeHTML(label.name)}</span>
+      <button class="danger-button" type="button">削除</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => deleteLabel(label));
+    els.labelList.append(row);
+  });
+}
+
+async function addLabel(event) {
+  event.preventDefault();
+  const name = els.labelNameInput.value.trim();
+  els.labelMessage.textContent = "";
+
+  if (!name) return;
+  if (state.labels.length >= MAX_LABELS) {
+    els.labelMessage.textContent = "ラベルは最大10件まで登録できます。";
+    return;
+  }
+  if (state.labels.some((label) => label.name === name)) {
+    els.labelMessage.textContent = "同じ名前のラベルが登録済みです。";
+    return;
+  }
+
+  const label = { id: crypto.randomUUID(), name };
+  if (canUseRemote()) {
+    const { error } = await supabaseClient.from("user_labels").insert({
+      ...label,
+      user_id: currentUser?.id,
+      position: state.labels.length
+    });
+    if (error) {
+      console.error(error);
+      els.labelMessage.textContent = "ラベルを追加できませんでした。";
+      return;
+    }
+    await loadRemote();
+  } else {
+    state.labels.push(label);
+    saveLocal();
+  }
+
+  els.labelForm.reset();
+  els.labelMessage.textContent = "ラベルを追加しました。";
+  render();
+}
+
+async function deleteLabel(label) {
+  if (canUseRemote()) {
+    const { error } = await supabaseClient.from("user_labels").delete().eq("id", label.id);
+    if (error) {
+      console.error(error);
+      els.labelMessage.textContent = "ラベルを削除できませんでした。";
+      return;
+    }
+
+    const { error: recipeError } = await supabaseClient
+      .from("recipes")
+      .update({ label: null })
+      .eq("label", label.name);
+    if (recipeError) console.error(recipeError);
+    await loadRemote();
+  } else {
+    state.labels = state.labels.filter((item) => item.id !== label.id);
+    state.recipes.forEach((recipe) => {
+      if (recipe.label === label.name) recipe.label = "";
+    });
+    saveLocal();
+  }
+
+  els.labelMessage.textContent = "ラベルを削除しました。";
+  render();
 }
 
 async function deleteSelectedRecipe() {

@@ -7,12 +7,44 @@ create table if not exists public.recipes (
   source_title text,
   servings integer not null default 2,
   tags text[] not null default '{}',
+  label text,
   ingredients jsonb not null default '[]'::jsonb,
   steps text[] not null default '{}',
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.recipes add column if not exists label text;
+
+create table if not exists public.user_labels (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  position integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (user_id, name),
+  constraint user_labels_name_length check (char_length(name) between 1 and 30)
+);
+
+create or replace function public.enforce_user_label_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.user_labels where user_id = new.user_id) >= 10 then
+    raise exception 'Labels are limited to 10 per user';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists user_labels_enforce_limit on public.user_labels;
+create trigger user_labels_enforce_limit
+before insert on public.user_labels
+for each row execute function public.enforce_user_label_limit();
 
 create table if not exists public.meal_plan_entries (
   id uuid primary key default gen_random_uuid(),
@@ -87,6 +119,7 @@ alter table public.meal_plan_entries enable row level security;
 alter table public.shopping_checks enable row level security;
 alter table public.profiles enable row level security;
 alter table public.login_ids enable row level security;
+alter table public.user_labels enable row level security;
 
 grant select, insert, update, delete on table public.recipes to authenticated;
 grant select, insert, update, delete on table public.meal_plan_entries to authenticated;
@@ -94,6 +127,32 @@ grant select, insert, update, delete on table public.shopping_checks to authenti
 grant select, insert, update on table public.profiles to authenticated;
 grant select on table public.login_ids to anon, authenticated;
 grant insert, update, delete on table public.login_ids to authenticated;
+grant select, insert, update, delete on table public.user_labels to authenticated;
+
+drop policy if exists "user_labels_select_own" on public.user_labels;
+create policy "user_labels_select_own"
+on public.user_labels for select
+to authenticated
+using (auth.uid() = user_id);
+
+drop policy if exists "user_labels_insert_own" on public.user_labels;
+create policy "user_labels_insert_own"
+on public.user_labels for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+drop policy if exists "user_labels_update_own" on public.user_labels;
+create policy "user_labels_update_own"
+on public.user_labels for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "user_labels_delete_own" on public.user_labels;
+create policy "user_labels_delete_own"
+on public.user_labels for delete
+to authenticated
+using (auth.uid() = user_id);
 
 drop policy if exists "recipes_select_own" on public.recipes;
 create policy "recipes_select_own"
