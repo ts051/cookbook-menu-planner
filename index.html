@@ -8,9 +8,9 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=icons-20260708" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260714-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260724-1" />
     <script src="./supabase-config.js"></script>
-    <script defer src="./app.js?v=20260714-3"></script>
+    <script defer src="./app.js?v=20260724-1"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -42,6 +42,7 @@
         </div>
         <div id="menuStatus" class="menu-status"></div>
         <div class="menu-actions">
+          <button id="labelSettingsButton" class="secondary-button" type="button">ラベル設定</button>
           <button id="seedButton" class="secondary-button" type="button">DBサンプル投入</button>
           <button id="syncButton" class="secondary-button" type="button">再読込</button>
         </div>
@@ -111,7 +112,6 @@
                 <h2>レシピDB</h2>
                 <span id="recipeCount" class="subtle"></span>
               </div>
-              <button id="clearFormButton" class="secondary-button" type="button">クリア</button>
             </div>
 
             <form id="recipeForm" class="recipe-form">
@@ -132,7 +132,17 @@
               </div>
               <label>
                 タグ
-                <input id="tagsInput" type="text" placeholder="和食, 魚, 作り置き" />
+                <select id="tagsInput">
+                  <option value="">選択してください</option>
+                  <option value="主菜">主菜</option>
+                  <option value="副菜">副菜</option>
+                </select>
+              </label>
+              <label>
+                ラベル
+                <select id="recipeLabelInput">
+                  <option value="">ラベルなし</option>
+                </select>
               </label>
               <label>
                 材料
@@ -146,6 +156,7 @@
                 <button class="primary-button" type="submit">
                   保存
                 </button>
+                <button id="clearFormButton" class="secondary-button" type="button">クリア</button>
                 <button id="deleteRecipeButton" class="danger-button hidden" type="button">
                   <i data-lucide="trash-2"></i>
                   削除
@@ -162,7 +173,7 @@
               </div>
               <button id="parseButton" class="secondary-button" type="button">テキストから抽出</button>
             </div>
-            <div class="file-import-row">
+            <div class="file-import-row pdf-import-row">
               <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
               <button id="pdfImportButton" class="secondary-button" type="button">
                 PDF読込
@@ -221,9 +232,37 @@
               <h2>登録済みレシピ</h2>
               <span class="subtle">献立候補</span>
             </div>
-            <input id="searchInput" class="search-input" type="search" placeholder="検索" />
+            <div class="recipe-filters">
+              <select id="tagFilter" aria-label="タグで絞り込み">
+                <option value="">すべてのタグ</option>
+                <option value="主菜">主菜</option>
+                <option value="副菜">副菜</option>
+              </select>
+              <select id="labelFilter" aria-label="ラベルで絞り込み">
+                <option value="">すべてのラベル</option>
+              </select>
+            </div>
           </div>
           <div id="recipeList" class="recipe-list"></div>
+        </section>
+
+        <section class="panel label-settings-panel app-view" data-view="labels">
+          <div class="panel-heading">
+            <div>
+              <h2>ラベル設定</h2>
+              <span id="labelCount" class="subtle">0 / 10件</span>
+            </div>
+            <button id="closeLabelSettingsButton" class="secondary-button" type="button">レシピDBへ戻る</button>
+          </div>
+          <form id="labelForm" class="label-form">
+            <label>
+              新しいラベル
+              <input id="labelNameInput" type="text" maxlength="30" placeholder="例：時短、作り置き、お弁当" required />
+            </label>
+            <button id="addLabelButton" class="primary-button" type="submit">追加</button>
+          </form>
+          <div id="labelMessage" class="menu-status" aria-live="polite"></div>
+          <div id="labelList" class="label-list"></div>
         </section>
       </main>
       <nav id="mobileNav" class="mobile-nav" aria-label="主要メニュー">

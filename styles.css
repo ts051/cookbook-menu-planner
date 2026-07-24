@@ -521,6 +521,7 @@ select:focus {
 .plan-tools {
   margin-bottom: 14px;
   align-items: stretch;
+  flex-wrap: nowrap;
 }
 
 .plan-tools .primary-button {
@@ -528,7 +529,12 @@ select:focus {
 }
 
 .plan-tools select {
-  flex: 1 1 240px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pdf-import-row {
+  margin-bottom: 8px;
 }
 
 .calendar-grid {
@@ -652,8 +658,64 @@ select:focus {
   box-shadow: none;
 }
 
-.search-input {
-  max-width: 240px;
+.recipe-filters {
+  display: flex;
+  gap: 10px;
+  width: min(100%, 440px);
+}
+
+.recipe-filters select {
+  min-width: 0;
+}
+
+.label-settings-panel {
+  display: none;
+  min-height: 280px;
+}
+
+body[data-active-view="labels"] .app-view:not([data-view="labels"]) {
+  display: none;
+}
+
+body[data-active-view="labels"] .label-settings-panel {
+  display: block;
+}
+
+.label-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  max-width: 620px;
+}
+
+.label-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-width: 620px;
+}
+
+.label-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.label {
+  border-radius: 999px;
+  background: rgba(199, 133, 45, 0.14);
+  color: #8a5a18;
+  padding: 4px 8px;
+  font-weight: 700;
 }
 
 .recipe-list {
@@ -732,7 +794,7 @@ select:focus {
 
 @media (max-width: 680px) {
   body {
-    padding-bottom: 72px;
+    padding-bottom: 96px;
   }
 
   .hero {
@@ -780,12 +842,17 @@ select:focus {
   body[data-active-view="today"] .app-view[data-view="today"],
   body[data-active-view="shopping"] .app-view[data-view="shopping"],
   body[data-active-view="plan"] .app-view[data-view="plan"],
-  body[data-active-view="recipe"] .app-view[data-view="recipe"] {
+  body[data-active-view="recipe"] .app-view[data-view="recipe"],
+  body[data-active-view="labels"] .app-view[data-view="labels"] {
     display: block;
   }
 
   .dashboard-grid {
     display: block;
+  }
+
+  body[data-active-view="recipe"] .dashboard-grid .app-view + .app-view {
+    margin-top: 18px;
   }
 
   .day-cell {
@@ -854,6 +921,18 @@ select:focus {
     max-width: none;
   }
 
+  .recipe-filters,
+  .label-form {
+    width: 100%;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .recipe-filters select,
+  .label-form .primary-button {
+    width: 100%;
+  }
+
   .today-grid {
     gap: 10px;
   }
@@ -897,7 +976,7 @@ select:focus {
   }
 
   .mobile-nav-button {
-    min-height: 52px;
+    min-height: 78px;
     border: 0;
     background: transparent;
     color: var(--muted);
