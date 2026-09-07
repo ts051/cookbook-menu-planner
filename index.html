@@ -59,11 +59,6 @@
         <section class="app-view" data-view="home">
           <div class="page-intro">
             <div><span class="eyebrow">HOTCOOK RECIPE BOOK</span><h1>今週、何をつくる？</h1><p>気になる料理にチェックを入れて、1週間のメニューに追加できます。</p></div>
-            <button id="openWeekButton" class="week-summary" type="button"><span>今週の予定</span><strong id="plannedMealCount">0</strong><small>件</small></button>
-          </div>
-          <div id="selectionTray" class="selection-tray" aria-live="polite">
-            <div><strong><span id="selectedCount">0</span>件選択中</strong><span id="selectionHint">料理のチェックボックスを選んでください</span></div>
-            <button id="clearSelectionButton" class="text-button hidden" type="button">選択解除</button>
             <button id="scheduleSelectionButton" class="primary-button" type="button" disabled>1週間メニューに追加</button>
           </div>
           <div id="genreContainer" class="genre-container"></div>
@@ -111,8 +106,8 @@
 
     <dialog id="scheduleDialog" class="schedule-dialog">
       <form id="scheduleForm" method="dialog">
-        <div class="schedule-header"><div><span class="eyebrow">ADD TO WEEK</span><h2>曜日と時間を選ぶ</h2></div><button id="closeScheduleDialog" class="dialog-close inline-close" type="button" aria-label="閉じる">×</button></div>
-        <p>選んだ料理ごとに、追加する曜日と朝・昼・夜を指定してください。</p>
+        <div class="schedule-header"><div><span class="eyebrow">ADD TO WEEK</span><h2>曜日と品数枠を選ぶ</h2></div><button id="closeScheduleDialog" class="dialog-close inline-close" type="button" aria-label="閉じる">×</button></div>
+        <p>選んだ料理ごとに、追加する曜日と1〜3品目を指定してください。</p>
         <div id="scheduleRows" class="schedule-rows"></div>
         <p id="scheduleMessage" class="form-message" aria-live="polite"></p>
         <div class="dialog-actions"><button id="cancelScheduleButton" class="secondary-button" type="button">キャンセル</button><button class="primary-button" type="submit">登録する</button></div>

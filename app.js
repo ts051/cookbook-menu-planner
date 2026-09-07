@@ -14,10 +14,11 @@ const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const mealSlots = [
-  { id: "breakfast", label: "朝" },
-  { id: "lunch", label: "昼" },
-  { id: "dinner", label: "夜" }
+  { id: "dish1", label: "1品目" },
+  { id: "dish2", label: "2品目" },
+  { id: "dish3", label: "3品目" }
 ];
+const legacyMealSlots = ["breakfast", "lunch", "dinner"];
 
 let supabaseClient = null;
 let currentUser = null;
@@ -48,8 +49,7 @@ function bindElements() {
   [
     "storageBadge", "menuButton", "menuOverlay", "appMenu", "menuCloseButton", "menuUserName", "menuStatus",
     "profileForm", "displayNameInput", "newPasswordInput", "syncButton", "signOutButton", "authPanel", "authForm",
-    "usernameInput", "passwordInput", "authBadge", "appContent", "openWeekButton", "plannedMealCount", "selectionTray",
-    "selectedCount", "selectionHint", "clearSelectionButton", "scheduleSelectionButton", "genreContainer", "weekRange",
+    "usernameInput", "passwordInput", "authBadge", "appContent", "scheduleSelectionButton", "genreContainer", "weekRange",
     "prevWeekButton", "currentWeekButton", "nextWeekButton", "weeklyGrid", "shoppingWeekRange", "shoppingProgress",
     "shoppingList", "prevShoppingWeekButton", "currentShoppingWeekButton", "nextShoppingWeekButton", "recipeDialog", "closeRecipeDialog", "dialogRecipeImage", "dialogRecipeGenre", "dialogRecipeTitle",
     "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "scheduleDialog", "scheduleForm",
@@ -66,8 +66,6 @@ function bindEvents() {
   els.signOutButton.addEventListener("click", signOut);
   els.syncButton.addEventListener("click", async () => { await loadAll(); render(); closeMenu(); showToast("最新データを読み込みました"); });
   document.querySelectorAll("[data-view-link]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.viewLink)));
-  els.openWeekButton.addEventListener("click", () => switchView("week"));
-  els.clearSelectionButton.addEventListener("click", clearSelection);
   els.scheduleSelectionButton.addEventListener("click", openScheduleDialog);
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
@@ -135,9 +133,7 @@ function renderHome() {
     els.genreContainer.append(section);
   });
 
-  const planned = state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor)).length;
-  els.plannedMealCount.textContent = String(planned);
-  renderSelectionTray();
+  renderSelectionButton();
 }
 
 function createRecipeCard(recipe) {
@@ -160,12 +156,10 @@ function createRecipeCard(recipe) {
   return card;
 }
 
-function renderSelectionTray() {
+function renderSelectionButton() {
   const count = selectedRecipeIds.size;
-  els.selectedCount.textContent = String(count);
   els.scheduleSelectionButton.disabled = count === 0;
-  els.clearSelectionButton.classList.toggle("hidden", count === 0);
-  els.selectionHint.textContent = count ? "曜日と朝・昼・夜を指定して登録できます" : "料理のチェックボックスを選んでください";
+  els.scheduleSelectionButton.textContent = count ? `1週間メニューに追加（${count}）` : "1週間メニューに追加";
 }
 
 function setRecipeSelected(id, selected) {
@@ -173,11 +167,6 @@ function setRecipeSelected(id, selected) {
   else selectedRecipeIds.delete(id);
   renderHome();
   if (currentDialogRecipeId === id && els.recipeDialog.open) updateDialogSelectButton();
-}
-
-function clearSelection() {
-  selectedRecipeIds.clear();
-  renderHome();
 }
 
 function openRecipeDialog(recipe) {
@@ -218,9 +207,9 @@ function openScheduleDialog() {
     row.innerHTML = `
       <div class="schedule-recipe"><img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong></div>
       <select class="schedule-day" aria-label="${escapeHTML(recipe.title)}の曜日">${weekDayOptions(index)}</select>
-      <select class="schedule-slot" aria-label="${escapeHTML(recipe.title)}の時間帯">${mealSlots.map((slot) => `<option value="${slot.id}">${slot.label}</option>`).join("")}</select>
+      <select class="schedule-slot" aria-label="${escapeHTML(recipe.title)}の品数枠">${mealSlots.map((slot) => `<option value="${slot.id}">${slot.label}</option>`).join("")}</select>
     `;
-    row.querySelector(".schedule-slot").value = "dinner";
+    row.querySelector(".schedule-slot").value = mealSlots[index % mealSlots.length].id;
     els.scheduleRows.append(row);
   });
   els.scheduleDialog.showModal();
@@ -245,7 +234,7 @@ async function saveSchedule(event) {
   }));
   const keys = entries.map((entry) => `${entry.plan_date}:${entry.meal_slot}`);
   if (new Set(keys).size !== keys.length) {
-    els.scheduleMessage.textContent = "同じ曜日・時間には1品だけ登録できます。選択を変更してください。";
+    els.scheduleMessage.textContent = "同じ曜日・品数枠には1品だけ登録できます。選択を変更してください。";
     return;
   }
 
@@ -275,9 +264,23 @@ async function saveSchedule(event) {
 function renderWeekViews() {
   renderWeek();
   renderShoppingList();
-  if (els.plannedMealCount) {
-    els.plannedMealCount.textContent = String(state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor)).length);
-  }
+}
+
+function getDayDisplayEntries(iso) {
+  const dayEntries = state.plan.filter((entry) => entry.plan_date === iso);
+  const legacyEntries = legacyMealSlots.map((slot) => dayEntries.find((entry) => entry.meal_slot === slot)).filter(Boolean);
+  let legacyIndex = 0;
+  return mealSlots.map((slot) => {
+    const current = dayEntries.find((entry) => entry.meal_slot === slot.id);
+    if (current) return current;
+    const legacy = legacyEntries[legacyIndex] || null;
+    legacyIndex += legacy ? 1 : 0;
+    return legacy;
+  });
+}
+
+function getWeekDisplayEntries() {
+  return Array.from({ length: 7 }, (_, index) => getDayDisplayEntries(toISODate(addDays(state.weekCursor, index)))).flat().filter(Boolean);
 }
 
 function renderWeek() {
@@ -292,8 +295,9 @@ function renderWeek() {
     column.className = `day-column${iso === today ? " today" : ""}`;
     column.innerHTML = `<div class="day-heading"><strong>${weekdays[index]}</strong><span>${date.getMonth() + 1}/${date.getDate()}</span></div><div class="meal-slots"></div>`;
     const slots = column.querySelector(".meal-slots");
-    mealSlots.forEach((slot) => {
-      const entry = state.plan.find((item) => item.plan_date === iso && item.meal_slot === slot.id);
+    const displayEntries = getDayDisplayEntries(iso);
+    mealSlots.forEach((slot, slotIndex) => {
+      const entry = displayEntries[slotIndex];
       const recipe = entry ? state.recipes.find((item) => item.id === entry.recipe_id) : null;
       const container = document.createElement("div");
       container.className = "meal-slot";
@@ -360,7 +364,7 @@ function renderShoppingList() {
 }
 
 function getShoppingItems() {
-  const entries = state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor));
+  const entries = getWeekDisplayEntries();
   const bucket = new Map();
   entries.forEach((entry) => {
     const recipe = state.recipes.find((item) => item.id === entry.recipe_id);
@@ -458,11 +462,50 @@ function canUseRemote() {
 async function loadAll() {
   if (canUseRemote()) {
     const loaded = await loadRemote();
-    if (loaded) await seedDefaultRecipesIfNeeded();
+    if (loaded) {
+      await seedDefaultRecipesIfNeeded();
+      await removeDuplicateRecipes();
+    }
   } else {
     loadLocal();
     await seedDefaultRecipesIfNeeded();
+    await removeDuplicateRecipes();
   }
+}
+
+function normalizedRecipeTitle(title) {
+  return String(title || "").normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("ja");
+}
+
+async function removeDuplicateRecipes() {
+  const grouped = new Map();
+  state.recipes.forEach((recipe) => {
+    const key = normalizedRecipeTitle(recipe.title);
+    if (!key) return;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(recipe);
+  });
+  const replacements = new Map();
+  grouped.forEach((recipes) => {
+    if (recipes.length < 2) return;
+    const keeper = recipes.find((recipe) => String(recipe.source_title || "").startsWith(window.HOTCOOK_RECIPE_BOOK?.title || "")) || recipes[0];
+    recipes.filter((recipe) => recipe.id !== keeper.id).forEach((recipe) => replacements.set(recipe.id, keeper.id));
+  });
+  if (!replacements.size) return;
+
+  if (canUseRemote()) {
+    for (const [duplicateId, keeperId] of replacements) {
+      const { error } = await supabaseClient.from("meal_plan_entries").update({ recipe_id: keeperId }).eq("recipe_id", duplicateId);
+      if (error) { console.error(error); return; }
+    }
+    const duplicateIds = [...replacements.keys()];
+    const { error } = await supabaseClient.from("recipes").delete().in("id", duplicateIds);
+    if (error) { console.error(error); return; }
+  }
+
+  state.plan = state.plan.map((entry) => ({ ...entry, recipe_id: replacements.get(entry.recipe_id) || entry.recipe_id }));
+  state.recipes = state.recipes.filter((recipe) => !replacements.has(recipe.id));
+  if (!canUseRemote()) saveLocal();
 }
 
 async function loadRemote() {
