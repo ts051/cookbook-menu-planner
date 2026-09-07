@@ -537,6 +537,10 @@ select:focus {
   margin-bottom: 8px;
 }
 
+.import-help {
+  margin: -4px 0 0;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

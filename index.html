@@ -8,9 +8,10 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=icons-20260708" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260724-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260907-1" />
     <script src="./supabase-config.js"></script>
-    <script defer src="./app.js?v=20260724-1"></script>
+    <script defer src="./hotcook-recipes.js?v=20260907-1"></script>
+    <script defer src="./app.js?v=20260907-1"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -176,9 +177,10 @@
             <div class="file-import-row pdf-import-row">
               <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
               <button id="pdfImportButton" class="secondary-button" type="button">
-                PDF読込
+                PDF取込
               </button>
             </div>
+            <p class="subtle import-help">「ホットクックレシピ30選」は全メニューを一括登録します。その他のPDFは入力欄へテキストを抽出します。</p>
             <textarea id="ebookInput" rows="12" placeholder="料理名&#10;材料（2人分）&#10;鶏もも肉 300g&#10;長ねぎ 1本&#10;&#10;作り方&#10;1. 材料を切る&#10;2. フライパンで焼く"></textarea>
             <div id="parseResult" class="parse-result"></div>
           </div>

@@ -8,6 +8,7 @@ const isConfigured = Boolean(
 
 const STORAGE_KEY = "cookbook-menu-planner:v1";
 const SHOPPING_ORDER_STORAGE_KEY = "cookbook-menu-planner-shopping-order:v1";
+const DEFAULT_RECIPE_SEED_KEY = "cookbook-menu-planner-default-recipes:rakulifemiho-ver1-4";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
@@ -578,10 +579,12 @@ function canUseRemote() {
 
 async function loadAll() {
   if (canUseRemote()) {
-    await loadRemote();
+    const loaded = await loadRemote();
+    if (loaded) await seedDefaultRecipesIfNeeded();
     return;
   }
   loadLocal();
+  await seedDefaultRecipesIfNeeded();
 }
 
 async function loadRemote() {
@@ -603,7 +606,7 @@ async function loadRemote() {
   if (recipesError || planError || checksError || profileError) {
     console.error(recipesError || planError || checksError || profileError);
     loadLocal();
-    return;
+    return false;
   }
   if (labelsError) console.warn(labelsError);
 
@@ -615,6 +618,7 @@ async function loadRemote() {
   if (currentUser && state.profile?.username) {
     await replaceLoginId(currentUser, state.profile.username, false);
   }
+  return true;
 }
 
 function loadLocal() {
@@ -1159,6 +1163,12 @@ async function importPdfFile() {
     return;
   }
 
+  const knownBook = window.HOTCOOK_RECIPE_BOOK;
+  if (knownBook?.filenamePattern?.test(file.name)) {
+    await importKnownRecipeBook(knownBook);
+    return;
+  }
+
   els.parseResult.textContent = "PDFを読み込んでいます。";
   try {
     const text = await extractPdfText(file);
@@ -1172,6 +1182,83 @@ async function importPdfFile() {
     console.error(error);
     els.parseResult.textContent = "PDF読込に失敗しました。";
   }
+}
+
+async function importKnownRecipeBook(book) {
+  els.parseResult.textContent = `${book.title}の全メニューを登録しています。`;
+  const recipes = createBookRecipes(book, new Set(state.recipes.map((recipe) => recipe.title)));
+
+  if (!recipes.length) {
+    els.parseResult.textContent = `${book.title}の全${book.recipes.length}件は登録済みです。`;
+    return;
+  }
+
+  if (canUseRemote()) {
+    const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser?.id }));
+    const { error } = await supabaseClient.from("recipes").insert(payload);
+    if (error) {
+      console.error(error);
+      els.parseResult.textContent = "一括登録に失敗しました。";
+      return;
+    }
+    await loadRemote();
+  } else {
+    state.recipes = [...recipes, ...state.recipes];
+    saveLocal();
+  }
+
+  localStorage.setItem(defaultRecipeSeedStorageKey(), "1");
+  render();
+  const skipped = book.recipes.length - recipes.length;
+  els.parseResult.textContent = skipped
+    ? `${recipes.length}件を登録しました（登録済み${skipped}件はスキップ）。`
+    : `全${recipes.length}件を登録しました。`;
+}
+
+function createBookRecipes(book, existingTitles = new Set()) {
+  return book.recipes
+    .filter((recipe) => !existingTitles.has(recipe.title))
+    .map((recipe) => ({
+      id: crypto.randomUUID(),
+      title: recipe.title,
+      source_title: `${book.title} p.${recipe.page}`,
+      servings: recipe.servings || 4,
+      tags: recipe.tags || [],
+      label: "",
+      ingredients: (recipe.ingredients || []).map(parseIngredientLine),
+      steps: recipe.steps || [],
+      notes: ""
+    }));
+}
+
+function defaultRecipeSeedStorageKey() {
+  return `${DEFAULT_RECIPE_SEED_KEY}:${currentUser?.id || "local"}`;
+}
+
+async function seedDefaultRecipesIfNeeded() {
+  const book = window.HOTCOOK_RECIPE_BOOK;
+  const markerKey = defaultRecipeSeedStorageKey();
+  if (!book || localStorage.getItem(markerKey)) return;
+
+  const recipes = createBookRecipes(book, new Set(state.recipes.map((recipe) => recipe.title)));
+  if (canUseRemote()) {
+    const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser?.id }));
+    if (payload.length) {
+      const { data, error } = await supabaseClient.from("recipes").insert(payload).select("*");
+      if (error) {
+        console.error(error);
+        return;
+      }
+      state.recipes = [...(data || recipes), ...state.recipes];
+    }
+  } else {
+    if (recipes.length) {
+      state.recipes = [...recipes, ...state.recipes];
+      saveLocal();
+    }
+  }
+
+  localStorage.setItem(markerKey, "1");
 }
 
 async function extractPdfText(file) {
@@ -1412,7 +1499,7 @@ function parseIngredientLine(line) {
   const normalized = String(line || "").trim().replace(/\s+/g, " ");
   if (!normalized) return { name: "", quantity: null, unit: "", note: "" };
 
-  const match = normalized.match(/^(.+?)\s+([0-9０-９./]+(?:\s*\/\s*[0-9０-９.]+)?)(g|kg|ml|l|L|cc|個|本|枚|切れ|袋|丁|束|大さじ|小さじ|カップ)?(?:\s*(.*))?$/);
+  const match = normalized.match(/^(.+?)\s+([0-9０-９./]+(?:\s*\/\s*[0-9０-９.]+)?)(g|kg|ml|l|L|cc|個|本|枚|切れ|袋|丁|束|パック|株|缶|箱|かけ|合|玉|大さじ|小さじ|カップ)?(?:\s*(.*))?$/);
   if (!match) {
     const spoonMatch = normalized.match(/^(.+?)\s+(大さじ|小さじ|カップ)([0-9０-９./]+)(.*)$/);
     if (spoonMatch) {
