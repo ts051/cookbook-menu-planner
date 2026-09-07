@@ -6,128 +6,33 @@ const isConfigured = Boolean(
     !config.SUPABASE_ANON_KEY.includes("YOUR_")
 );
 
-const STORAGE_KEY = "cookbook-menu-planner:v1";
-const SHOPPING_ORDER_STORAGE_KEY = "cookbook-menu-planner-shopping-order:v1";
+const STORAGE_KEY = "cookbook-menu-planner:v2";
+const LEGACY_STORAGE_KEY = "cookbook-menu-planner:v1";
 const DEFAULT_RECIPE_SEED_KEY = "cookbook-menu-planner-default-recipes:rakulifemiho-ver1-4";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
-const MAX_LABELS = 10;
-const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
-const iconFallbacks = {
-  "database": "DB",
-  "refresh-cw": "↻",
-  "x": "×",
-  "user-round-pen": "✎",
-  "log-out": "⇱",
-  "key-round": "⚿",
-  "shopping-basket": "▤",
-  "calendar-days": "▦",
-  "eraser": "⌫",
-  "save": "✓",
-  "trash-2": "×",
-  "scan-text": "⌕",
-  "file-text": "PDF",
-  "chevron-left": "‹",
-  "chevron-right": "›",
-  "wand-sparkles": "✦",
-  "pencil": "✎",
-  "utensils": "♨",
-  "book-open": "▥"
-};
-const sampleRecipes = [
-  {
-    title: "鮭の南蛮漬け",
-    source_title: "和食の基本 p.42",
-    servings: 2,
-    tags: ["主菜"],
-    label: "",
-    ingredients: [
-      parseIngredientLine("鮭 2切れ"),
-      parseIngredientLine("玉ねぎ 1/2個"),
-      parseIngredientLine("にんじん 1/3本"),
-      parseIngredientLine("酢 大さじ3"),
-      parseIngredientLine("しょうゆ 大さじ2")
-    ],
-    steps: ["鮭に塩をふり、水気を拭く", "野菜を薄切りにする", "鮭を焼き、調味液に漬ける"]
-  },
-  {
-    title: "鶏と長ねぎの照り焼き",
-    source_title: "毎日の定番 p.18",
-    servings: 2,
-    tags: ["主菜"],
-    label: "",
-    ingredients: [
-      parseIngredientLine("鶏もも肉 300g"),
-      parseIngredientLine("長ねぎ 1本"),
-      parseIngredientLine("しょうゆ 大さじ2"),
-      parseIngredientLine("みりん 大さじ2"),
-      parseIngredientLine("砂糖 小さじ1")
-    ],
-    steps: ["鶏肉を一口大に切る", "長ねぎと焼く", "調味料を煮絡める"]
-  },
-  {
-    title: "なすとトマトの味噌炒め",
-    source_title: "野菜のおかず p.73",
-    servings: 2,
-    tags: ["主菜"],
-    label: "",
-    ingredients: [
-      parseIngredientLine("なす 3本"),
-      parseIngredientLine("トマト 1個"),
-      parseIngredientLine("豚こま肉 150g"),
-      parseIngredientLine("味噌 大さじ1"),
-      parseIngredientLine("酒 大さじ1")
-    ],
-    steps: ["なすを乱切りにする", "豚肉を炒める", "野菜と調味料を加えて炒める"]
-  },
-  {
-    title: "豆腐ときのこの卵とじ",
-    source_title: "軽い夕食 p.29",
-    servings: 2,
-    tags: ["副菜"],
-    label: "",
-    ingredients: [
-      parseIngredientLine("木綿豆腐 1丁"),
-      parseIngredientLine("しめじ 1袋"),
-      parseIngredientLine("卵 2個"),
-      parseIngredientLine("だし 150ml"),
-      parseIngredientLine("しょうゆ 大さじ1")
-    ],
-    steps: ["豆腐を水切りする", "きのこを煮る", "卵を回し入れる"]
-  },
-  {
-    title: "キャベツと豚肉の蒸し煮",
-    source_title: "春野菜 p.11",
-    servings: 2,
-    tags: ["主菜"],
-    label: "",
-    ingredients: [
-      parseIngredientLine("キャベツ 1/4玉"),
-      parseIngredientLine("豚バラ肉 180g"),
-      parseIngredientLine("しょうが 1かけ"),
-      parseIngredientLine("酒 大さじ2"),
-      parseIngredientLine("ポン酢 大さじ2")
-    ],
-    steps: ["材料を重ねる", "酒を加えて蒸す", "ポン酢で仕上げる"]
-  }
+const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+const mealSlots = [
+  { id: "breakfast", label: "朝" },
+  { id: "lunch", label: "昼" },
+  { id: "dinner", label: "夜" }
 ];
 
 let supabaseClient = null;
 let currentUser = null;
-let state = {
+let currentDialogRecipeId = "";
+let toastTimer = null;
+const selectedRecipeIds = new Set();
+const els = {};
+const state = {
   recipes: [],
   plan: [],
   checks: {},
-  shoppingOrders: {},
-  labels: [],
   profile: null,
-  activeView: "today",
-  monthCursor: startOfMonth(new Date()),
+  activeView: "home",
   weekCursor: startOfWeek(new Date())
 };
-
-const els = {};
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -135,79 +40,21 @@ async function init() {
   bindElements();
   bindEvents();
   await setupStorage();
-  loadShoppingOrders();
   await loadAll();
   render();
-  window.addEventListener("load", loadOptionalLucide, { once: true });
 }
 
 function bindElements() {
   [
-    "storageBadge",
-    "authBadge",
-    "authPanel",
-    "authForm",
-    "menuButton",
-    "menuCloseButton",
-    "menuOverlay",
-    "appMenu",
-    "menuUserName",
-    "menuStatus",
-    "todayDateLabel",
-    "todayMealTitle",
-    "todayMealMeta",
-    "todayIngredients",
-    "todaySteps",
-    "mobileNav",
-    "usernameInput",
-    "passwordInput",
-    "profileForm",
-    "displayNameInput",
-    "newPasswordInput",
-    "signOutButton",
-    "seedButton",
-    "syncButton",
-    "labelSettingsButton",
-    "recipeCount",
-    "recipeForm",
-    "recipeId",
-    "titleInput",
-    "sourceInput",
-    "servingsInput",
-    "tagsInput",
-    "recipeLabelInput",
-    "ingredientsInput",
-    "stepsInput",
-    "clearFormButton",
-    "deleteRecipeButton",
-    "ebookInput",
-    "pdfInput",
-    "pdfImportButton",
-    "parseButton",
-    "parseResult",
-    "monthLabel",
-    "prevMonthButton",
-    "nextMonthButton",
-    "suggestMonthButton",
-    "recipeSelect",
-    "calendarGrid",
-    "weekLabel",
-    "prevWeekButton",
-    "nextWeekButton",
-    "shoppingList",
-    "tagFilter",
-    "labelFilter",
-    "labelForm",
-    "labelNameInput",
-    "addLabelButton",
-    "labelCount",
-    "labelMessage",
-    "labelList",
-    "closeLabelSettingsButton",
-    "recipeList"
-  ].forEach((id) => {
-    els[id] = document.getElementById(id);
-  });
+    "storageBadge", "menuButton", "menuOverlay", "appMenu", "menuCloseButton", "menuUserName", "menuStatus",
+    "profileForm", "displayNameInput", "newPasswordInput", "syncButton", "signOutButton", "authPanel", "authForm",
+    "usernameInput", "passwordInput", "authBadge", "appContent", "openWeekButton", "plannedMealCount", "selectionTray",
+    "selectedCount", "selectionHint", "clearSelectionButton", "scheduleSelectionButton", "genreContainer", "weekRange",
+    "prevWeekButton", "currentWeekButton", "nextWeekButton", "weeklyGrid", "shoppingWeekRange", "shoppingProgress",
+    "shoppingList", "prevShoppingWeekButton", "currentShoppingWeekButton", "nextShoppingWeekButton", "recipeDialog", "closeRecipeDialog", "dialogRecipeImage", "dialogRecipeGenre", "dialogRecipeTitle",
+    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "scheduleDialog", "scheduleForm",
+    "closeScheduleDialog", "cancelScheduleButton", "scheduleRows", "scheduleMessage", "toast"
+  ].forEach((id) => { els[id] = document.getElementById(id); });
 }
 
 function bindEvents() {
@@ -217,360 +64,391 @@ function bindEvents() {
   els.authForm.addEventListener("submit", handleAuthSubmit);
   els.profileForm.addEventListener("submit", handleProfileSave);
   els.signOutButton.addEventListener("click", signOut);
-  els.seedButton.addEventListener("click", seedSamples);
-  els.syncButton.addEventListener("click", async () => {
-    await loadAll();
-    render();
-  });
-  els.labelSettingsButton.addEventListener("click", () => {
-    closeMenu();
-    switchView("labels");
-  });
-  els.recipeForm.addEventListener("submit", handleRecipeSave);
-  els.clearFormButton.addEventListener("click", clearRecipeForm);
-  els.deleteRecipeButton.addEventListener("click", deleteSelectedRecipe);
-  els.parseButton.addEventListener("click", parseEbookText);
-  els.pdfImportButton.addEventListener("click", importPdfFile);
-  els.prevMonthButton.addEventListener("click", () => moveMonth(-1));
-  els.nextMonthButton.addEventListener("click", () => moveMonth(1));
-  els.suggestMonthButton.addEventListener("click", suggestMonthPlan);
+  els.syncButton.addEventListener("click", async () => { await loadAll(); render(); closeMenu(); showToast("最新データを読み込みました"); });
+  document.querySelectorAll("[data-view-link]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.viewLink)));
+  els.openWeekButton.addEventListener("click", () => switchView("week"));
+  els.clearSelectionButton.addEventListener("click", clearSelection);
+  els.scheduleSelectionButton.addEventListener("click", openScheduleDialog);
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
-  els.tagFilter.addEventListener("change", renderRecipeList);
-  els.labelFilter.addEventListener("change", renderRecipeList);
-  els.labelForm.addEventListener("submit", addLabel);
-  els.closeLabelSettingsButton.addEventListener("click", () => switchView("recipe"));
-  els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
-    button.addEventListener("click", () => switchView(button.dataset.tab));
-  });
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeMenu();
-  });
+  els.currentWeekButton.addEventListener("click", () => { state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
+  els.prevShoppingWeekButton.addEventListener("click", () => moveWeek(-1));
+  els.nextShoppingWeekButton.addEventListener("click", () => moveWeek(1));
+  els.currentShoppingWeekButton.addEventListener("click", () => { state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
+  els.closeRecipeDialog.addEventListener("click", () => els.recipeDialog.close());
+  els.dialogSelectButton.addEventListener("click", toggleDialogRecipeSelection);
+  els.closeScheduleDialog.addEventListener("click", () => els.scheduleDialog.close());
+  els.cancelScheduleButton.addEventListener("click", () => els.scheduleDialog.close());
+  els.scheduleForm.addEventListener("submit", saveSchedule);
+  [els.recipeDialog, els.scheduleDialog].forEach((dialog) => dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  }));
+  window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
 }
 
-function toggleMenu() {
-  if (els.appMenu.classList.contains("hidden")) openMenu();
-  else closeMenu();
-}
-
-function openMenu() {
-  els.appMenu.classList.remove("hidden");
-  els.menuOverlay.classList.remove("hidden");
-  els.appMenu.setAttribute("aria-hidden", "false");
-  els.menuButton.setAttribute("aria-expanded", "true");
+function render() {
+  renderAuth();
   renderAccountMenu();
+  renderNavigation();
+  renderHome();
+  renderWeekViews();
 }
 
-function closeMenu() {
-  if (!els.appMenu || !els.menuOverlay) return;
-  els.appMenu.classList.add("hidden");
-  els.menuOverlay.classList.add("hidden");
-  els.appMenu.setAttribute("aria-hidden", "true");
-  els.menuButton.setAttribute("aria-expanded", "false");
-}
-
-function setupIcons() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
-  renderIconFallbacks();
-}
-
-function renderIconFallbacks() {
-  document.querySelectorAll("i[data-lucide]").forEach((icon) => {
-    if (icon.querySelector("svg")) return;
-    icon.classList.add("icon-fallback");
-    icon.textContent = iconFallbacks[icon.dataset.lucide] || "•";
+function renderNavigation() {
+  document.querySelectorAll("[data-view-link]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.viewLink === state.activeView);
   });
+  document.querySelectorAll(".app-view").forEach((view) => view.classList.toggle("hidden", view.dataset.view !== state.activeView));
+}
+
+function switchView(view) {
+  if (!["home", "week", "shopping"].includes(view)) return;
+  state.activeView = view;
+  renderNavigation();
+  if (view === "week") renderWeek();
+  if (view === "shopping") renderShoppingList();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderHome() {
+  const book = window.HOTCOOK_RECIPE_BOOK;
+  const genres = [...(book?.genres || [])];
+  const knownTitles = new Set((book?.recipes || []).map((recipe) => recipe.title));
+  const customRecipes = state.recipes.filter((recipe) => !knownTitles.has(recipe.title));
+  if (customRecipes.length) genres.push({ id: "other", title: "その他のメニュー", description: "追加したレシピ", custom: true });
+
+  els.genreContainer.innerHTML = "";
+  genres.forEach((genre) => {
+    const recipes = state.recipes.filter((recipe) => recipeGenreId(recipe) === genre.id);
+    if (!recipes.length) return;
+    const section = document.createElement("section");
+    section.className = "genre-section";
+    section.innerHTML = `
+      <div class="genre-heading">
+        <div><h2>${escapeHTML(genre.title)}</h2><p>${escapeHTML(genre.description || "")}</p></div>
+        <span class="genre-count">${recipes.length}品</span>
+      </div>
+      <div class="recipe-grid"></div>
+    `;
+    const grid = section.querySelector(".recipe-grid");
+    recipes.forEach((recipe) => grid.append(createRecipeCard(recipe)));
+    els.genreContainer.append(section);
+  });
+
+  const planned = state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor)).length;
+  els.plannedMealCount.textContent = String(planned);
+  renderSelectionTray();
+}
+
+function createRecipeCard(recipe) {
+  const card = document.createElement("article");
+  card.className = `recipe-card${selectedRecipeIds.has(recipe.id) ? " selected" : ""}`;
+  card.innerHTML = `
+    <button class="recipe-open" type="button" aria-label="${escapeHTML(recipe.title)}の詳細を見る">
+      <img class="recipe-thumb" src="${escapeHTML(recipeImage(recipe))}" alt="${escapeHTML(recipe.title)}" loading="lazy" />
+      <div class="recipe-card-body">
+        <h3>${escapeHTML(recipe.title)}</h3>
+        <div class="recipe-meta"><span>${recipe.servings || 4}人分</span><span>${escapeHTML(recipe.source_title || "")}</span></div>
+      </div>
+    </button>
+    <label class="recipe-check-label" aria-label="${escapeHTML(recipe.title)}を選択">
+      <input class="recipe-check" type="checkbox" ${selectedRecipeIds.has(recipe.id) ? "checked" : ""} />
+    </label>
+  `;
+  card.querySelector(".recipe-open").addEventListener("click", () => openRecipeDialog(recipe));
+  card.querySelector(".recipe-check").addEventListener("change", (event) => setRecipeSelected(recipe.id, event.target.checked));
+  return card;
+}
+
+function renderSelectionTray() {
+  const count = selectedRecipeIds.size;
+  els.selectedCount.textContent = String(count);
+  els.scheduleSelectionButton.disabled = count === 0;
+  els.clearSelectionButton.classList.toggle("hidden", count === 0);
+  els.selectionHint.textContent = count ? "曜日と朝・昼・夜を指定して登録できます" : "料理のチェックボックスを選んでください";
+}
+
+function setRecipeSelected(id, selected) {
+  if (selected) selectedRecipeIds.add(id);
+  else selectedRecipeIds.delete(id);
+  renderHome();
+  if (currentDialogRecipeId === id && els.recipeDialog.open) updateDialogSelectButton();
+}
+
+function clearSelection() {
+  selectedRecipeIds.clear();
+  renderHome();
+}
+
+function openRecipeDialog(recipe) {
+  currentDialogRecipeId = recipe.id;
+  els.dialogRecipeImage.src = recipeImage(recipe);
+  els.dialogRecipeImage.alt = recipe.title;
+  els.dialogRecipeGenre.textContent = recipeGenreTitle(recipe);
+  els.dialogRecipeTitle.textContent = recipe.title;
+  els.dialogRecipeMeta.textContent = [recipe.source_title, `${recipe.servings || 4}人分`].filter(Boolean).join(" ・ ");
+  els.dialogIngredients.innerHTML = (recipe.ingredients || []).map((item) => `<div class="ingredient-row"><span>${escapeHTML(item.name)}</span><span>${escapeHTML(formatIngredientAmount(item))}</span></div>`).join("");
+  els.dialogSteps.innerHTML = (recipe.steps || []).map((step) => `<li>${escapeHTML(step)}</li>`).join("");
+  updateDialogSelectButton();
+  els.recipeDialog.showModal();
+}
+
+function updateDialogSelectButton() {
+  const selected = selectedRecipeIds.has(currentDialogRecipeId);
+  els.dialogSelectButton.textContent = selected ? "選択を解除" : "この料理を選択";
+  els.dialogSelectButton.classList.toggle("secondary-button", selected);
+}
+
+function toggleDialogRecipeSelection() {
+  const selected = !selectedRecipeIds.has(currentDialogRecipeId);
+  setRecipeSelected(currentDialogRecipeId, selected);
+  els.recipeDialog.close();
+  if (selected) showToast("料理を選択しました");
+}
+
+function openScheduleDialog() {
+  const recipes = state.recipes.filter((recipe) => selectedRecipeIds.has(recipe.id));
+  if (!recipes.length) return;
+  els.scheduleRows.innerHTML = "";
+  els.scheduleMessage.textContent = "";
+  recipes.forEach((recipe, index) => {
+    const row = document.createElement("div");
+    row.className = "schedule-row";
+    row.dataset.recipeId = recipe.id;
+    row.innerHTML = `
+      <div class="schedule-recipe"><img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong></div>
+      <select class="schedule-day" aria-label="${escapeHTML(recipe.title)}の曜日">${weekDayOptions(index)}</select>
+      <select class="schedule-slot" aria-label="${escapeHTML(recipe.title)}の時間帯">${mealSlots.map((slot) => `<option value="${slot.id}">${slot.label}</option>`).join("")}</select>
+    `;
+    row.querySelector(".schedule-slot").value = "dinner";
+    els.scheduleRows.append(row);
+  });
+  els.scheduleDialog.showModal();
+}
+
+function weekDayOptions(offset) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(state.weekCursor, index);
+    const selected = index === offset % 7 ? " selected" : "";
+    return `<option value="${toISODate(date)}"${selected}>${weekdays[index]} ${date.getMonth() + 1}/${date.getDate()}</option>`;
+  }).join("");
+}
+
+async function saveSchedule(event) {
+  event.preventDefault();
+  const rows = Array.from(els.scheduleRows.querySelectorAll(".schedule-row"));
+  const entries = rows.map((row) => ({
+    id: crypto.randomUUID(),
+    plan_date: row.querySelector(".schedule-day").value,
+    meal_slot: row.querySelector(".schedule-slot").value,
+    recipe_id: row.dataset.recipeId
+  }));
+  const keys = entries.map((entry) => `${entry.plan_date}:${entry.meal_slot}`);
+  if (new Set(keys).size !== keys.length) {
+    els.scheduleMessage.textContent = "同じ曜日・時間には1品だけ登録できます。選択を変更してください。";
+    return;
+  }
+
+  if (canUseRemote()) {
+    const payload = entries.map((entry) => ({ ...entry, user_id: currentUser.id }));
+    const { error } = await supabaseClient.from("meal_plan_entries").upsert(payload, { onConflict: "user_id,plan_date,meal_slot" });
+    if (error) {
+      console.error(error);
+      els.scheduleMessage.textContent = "登録できませんでした。もう一度お試しください。";
+      return;
+    }
+    await loadRemote();
+  } else {
+    const entryKeys = new Set(keys);
+    state.plan = state.plan.filter((entry) => !entryKeys.has(`${entry.plan_date}:${entry.meal_slot}`));
+    state.plan.push(...entries);
+    saveLocal();
+  }
+
+  selectedRecipeIds.clear();
+  els.scheduleDialog.close();
+  render();
+  switchView("week");
+  showToast(`${entries.length}件を1週間メニューに登録しました`);
+}
+
+function renderWeekViews() {
+  renderWeek();
+  renderShoppingList();
+  if (els.plannedMealCount) {
+    els.plannedMealCount.textContent = String(state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor)).length);
+  }
+}
+
+function renderWeek() {
+  const end = addDays(state.weekCursor, 6);
+  els.weekRange.textContent = formatWeekRange(state.weekCursor, end);
+  els.weeklyGrid.innerHTML = "";
+  const today = toISODate(new Date());
+  for (let index = 0; index < 7; index += 1) {
+    const date = addDays(state.weekCursor, index);
+    const iso = toISODate(date);
+    const column = document.createElement("article");
+    column.className = `day-column${iso === today ? " today" : ""}`;
+    column.innerHTML = `<div class="day-heading"><strong>${weekdays[index]}</strong><span>${date.getMonth() + 1}/${date.getDate()}</span></div><div class="meal-slots"></div>`;
+    const slots = column.querySelector(".meal-slots");
+    mealSlots.forEach((slot) => {
+      const entry = state.plan.find((item) => item.plan_date === iso && item.meal_slot === slot.id);
+      const recipe = entry ? state.recipes.find((item) => item.id === entry.recipe_id) : null;
+      const container = document.createElement("div");
+      container.className = "meal-slot";
+      container.innerHTML = `<span class="meal-slot-label">${slot.label}</span>`;
+      if (recipe) {
+        const card = document.createElement("div");
+        card.className = "meal-card";
+        card.innerHTML = `<img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong><button class="remove-meal" type="button">削除</button>`;
+        card.querySelector("img").addEventListener("click", () => openRecipeDialog(recipe));
+        card.querySelector("strong").addEventListener("click", () => openRecipeDialog(recipe));
+        card.querySelector(".remove-meal").addEventListener("click", () => removePlanEntry(entry));
+        container.append(card);
+      } else {
+        const empty = document.createElement("span");
+        empty.className = "empty-slot";
+        empty.textContent = "未登録";
+        container.append(empty);
+      }
+      slots.append(container);
+    });
+    els.weeklyGrid.append(column);
+  }
+}
+
+async function removePlanEntry(entry) {
+  if (canUseRemote()) {
+    const { error } = await supabaseClient.from("meal_plan_entries").delete().eq("id", entry.id);
+    if (error) { console.error(error); showToast("削除できませんでした"); return; }
+    await loadRemote();
+  } else {
+    state.plan = state.plan.filter((item) => item.id !== entry.id);
+    saveLocal();
+  }
+  renderWeekViews();
+  showToast("1週間メニューから削除しました");
+}
+
+function moveWeek(delta) {
+  state.weekCursor = addDays(state.weekCursor, delta * 7);
+  renderWeekViews();
+}
+
+function renderShoppingList() {
+  const end = addDays(state.weekCursor, 6);
+  els.shoppingWeekRange.textContent = formatWeekRange(state.weekCursor, end);
+  const items = getShoppingItems();
+  els.shoppingList.innerHTML = "";
+  if (!items.length) {
+    els.shoppingList.innerHTML = `<div class="empty-state">1週間メニューを登録すると、必要な食材がここにまとまります。</div>`;
+    els.shoppingProgress.textContent = "0 / 0";
+    return;
+  }
+  let checkedCount = 0;
+  items.forEach((item) => {
+    const checked = Boolean(state.checks[item.key]);
+    if (checked) checkedCount += 1;
+    const label = document.createElement("label");
+    label.className = `shopping-item${checked ? " checked" : ""}`;
+    label.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} /><strong>${escapeHTML(item.name)}</strong><span>${escapeHTML(item.amount)}</span>`;
+    label.querySelector("input").addEventListener("change", (event) => toggleShoppingCheck(item.key, event.target.checked));
+    els.shoppingList.append(label);
+  });
+  els.shoppingProgress.textContent = `${checkedCount} / ${items.length}`;
+}
+
+function getShoppingItems() {
+  const entries = state.plan.filter((entry) => isDateInWeek(entry.plan_date, state.weekCursor));
+  const bucket = new Map();
+  entries.forEach((entry) => {
+    const recipe = state.recipes.find((item) => item.id === entry.recipe_id);
+    (recipe?.ingredients || []).forEach((ingredient) => {
+      const name = normalizeIngredientName(ingredient.name);
+      if (!name) return;
+      const unit = ingredient.unit || "";
+      const key = `${toISODate(state.weekCursor)}:${name}:${unit}`;
+      const current = bucket.get(key) || { key, name, unit, quantity: 0, raw: [] };
+      if (typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity)) current.quantity += ingredient.quantity;
+      else current.raw.push(formatIngredient(ingredient));
+      bucket.set(key, current);
+    });
+  });
+  return Array.from(bucket.values()).map((item) => ({
+    key: item.key,
+    name: item.name,
+    amount: item.quantity ? `${roundQuantity(item.quantity)}${item.unit}` : [...new Set(item.raw)].join(" / ")
+  })).sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
+async function toggleShoppingCheck(key, checked) {
+  state.checks[key] = checked;
+  if (canUseRemote()) {
+    const { error } = await supabaseClient.from("shopping_checks").upsert({
+      user_id: currentUser.id,
+      week_start: toISODate(state.weekCursor),
+      item_key: key,
+      checked
+    }, { onConflict: "user_id,week_start,item_key" });
+    if (error) console.error(error);
+  } else saveLocal();
+  renderShoppingList();
+}
+
+function recipeBookEntry(recipe) {
+  return (window.HOTCOOK_RECIPE_BOOK?.recipes || []).find((item) => item.title === recipe.title);
+}
+
+function recipeImage(recipe) {
+  return recipeBookEntry(recipe)?.thumbnail || "./assets/cookbook-worktop.png";
+}
+
+function recipeGenreId(recipe) {
+  return recipeBookEntry(recipe)?.genre || "other";
+}
+
+function recipeGenreTitle(recipe) {
+  const id = recipeGenreId(recipe);
+  return window.HOTCOOK_RECIPE_BOOK?.genres?.find((genre) => genre.id === id)?.title || "その他のメニュー";
 }
 
 async function setupStorage() {
   if (!isConfigured) {
     els.storageBadge.textContent = "Local";
-    els.authBadge.textContent = "Supabase未設定";
-    els.authPanel.classList.add("hidden");
     return;
   }
-
   try {
     await loadScript("https://unpkg.com/@supabase/supabase-js@2", "supabase-js");
+    supabaseClient = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+    els.storageBadge.textContent = "Cloud";
+    const { data } = await supabaseClient.auth.getSession();
+    currentUser = data.session?.user || null;
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      currentUser = session?.user || null;
+      await loadAll();
+      render();
+    });
   } catch (error) {
     console.error(error);
+    supabaseClient = null;
     els.storageBadge.textContent = "Local";
-    els.authBadge.textContent = "Supabase読込失敗";
-    els.authPanel.classList.remove("hidden");
-    return;
   }
-
-  supabaseClient = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  els.storageBadge.textContent = "Supabase";
-
-  const { data } = await supabaseClient.auth.getSession();
-  currentUser = data.session?.user || null;
-
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-    currentUser = session?.user || null;
-    loadShoppingOrders();
-    await loadAll();
-    render();
-  });
-}
-
-function loadOptionalLucide() {
-  loadScript("https://unpkg.com/lucide@latest", "lucide-icons")
-    .then(setupIcons)
-    .catch(() => {
-      document.documentElement.classList.add("no-icons");
-      renderIconFallbacks();
-    });
 }
 
 function loadScript(src, id) {
   return new Promise((resolve, reject) => {
     const existing = document.getElementById(id);
-    if (existing) {
-      existing.addEventListener("load", resolve, { once: true });
-      existing.addEventListener("error", reject, { once: true });
-      return;
-    }
-
+    if (existing) { resolve(); return; }
     const script = document.createElement("script");
     script.id = id;
     script.src = src;
     script.async = true;
-    const timeout = window.setTimeout(() => {
-      reject(new Error(`Script load timed out: ${src}`));
-    }, 7000);
-    script.onload = () => {
-      window.clearTimeout(timeout);
-      resolve();
-    };
-    script.onerror = () => {
-      window.clearTimeout(timeout);
-      reject(new Error(`Script load failed: ${src}`));
-    };
+    const timeout = window.setTimeout(() => reject(new Error(`Script load timed out: ${src}`)), 7000);
+    script.onload = () => { window.clearTimeout(timeout); resolve(); };
+    script.onerror = () => { window.clearTimeout(timeout); reject(new Error(`Script load failed: ${src}`)); };
     document.head.append(script);
   });
-}
-
-function normalizeUsername(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^@+/, "")
-    .replace(/[^a-z0-9._-]/g, "");
-}
-
-function isValidUsername(value) {
-  return USERNAME_PATTERN.test(normalizeUsername(value));
-}
-
-function usernameToEmail(username) {
-  return `${normalizeUsername(username) || "user"}@${INTERNAL_EMAIL_DOMAIN}`;
-}
-
-function usernameToLegacyEmail(username) {
-  return `${normalizeUsername(username) || "user"}@${LEGACY_EMAIL_DOMAIN}`;
-}
-
-function emailLocalPart(email) {
-  return normalizeUsername(String(email || "").split("@")[0]);
-}
-
-function isMissingLoginIdsTable(error) {
-  const message = String(error?.message || "").toLowerCase();
-  return (
-    error?.code === "42P01" ||
-    error?.code === "PGRST205" ||
-    message.includes('relation "public.login_ids" does not exist') ||
-    (message.includes("schema cache") && message.includes("login_ids")) ||
-    (message.includes("could not find") && message.includes("login_ids"))
-  );
-}
-
-async function lookupLoginId(username) {
-  try {
-    const { data, error } = await supabaseClient
-      .from("login_ids")
-      .select("auth_email, is_active, user_id")
-      .eq("login_id", normalizeUsername(username))
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return { email: null, blocked: false, currentLoginId: "" };
-    if (data.is_active) return { email: data.auth_email, blocked: false, currentLoginId: "" };
-
-    const { data: activeRows, error: activeError } = await supabaseClient
-      .from("login_ids")
-      .select("login_id")
-      .eq("user_id", data.user_id)
-      .eq("is_active", true)
-      .limit(1);
-    if (activeError) throw activeError;
-    return {
-      email: null,
-      blocked: true,
-      currentLoginId: activeRows?.[0]?.login_id || ""
-    };
-  } catch (error) {
-    if (!isMissingLoginIdsTable(error)) console.warn("Login ID lookup failed:", error);
-    return { email: null, blocked: false, currentLoginId: "" };
-  }
-}
-
-async function signInWithUsername(username, password) {
-  const normalized = normalizeUsername(username);
-  if (!isValidUsername(normalized)) return { error: new Error("Invalid username.") };
-
-  const loginId = await lookupLoginId(normalized);
-  if (loginId.blocked) {
-    const message = loginId.currentLoginId
-      ? `現在のユーザー名: ${loginId.currentLoginId}`
-      : "ユーザー名が変更済み";
-    return { error: new Error(message) };
-  }
-
-  const emails = [loginId.email, usernameToEmail(normalized), usernameToLegacyEmail(normalized)].filter(Boolean);
-  let lastError = null;
-  for (const email of [...new Set(emails)]) {
-    const result = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (!result.error) return result;
-    lastError = result.error;
-  }
-  return { error: lastError || new Error("Login failed.") };
-}
-
-async function getProfile(user) {
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .select("id, username")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-async function ensureProfile(user, username) {
-  const profile = await getProfile(user);
-  if (profile) return profile;
-
-  const nextUsername = normalizeUsername(username) || emailLocalPart(user.email) || "user";
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .insert({ id: user.id, username: nextUsername })
-    .select("id, username")
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function replaceLoginId(user, loginId, required) {
-  const normalized = normalizeUsername(loginId);
-  if (!normalized) return;
-
-  const row = {
-    login_id: normalized,
-    user_id: user.id,
-    auth_email: user.email || usernameToEmail(normalized),
-    is_active: true
-  };
-
-  const { error: upsertError } = await supabaseClient
-    .from("login_ids")
-    .upsert(row, { onConflict: "login_id" });
-  if (upsertError) {
-    if (required && isMissingLoginIdsTable(upsertError)) {
-      throw new Error("ログインID管理テーブルが未設定です。supabase-schema.sql を Supabase に適用してください。");
-    }
-    if (required || !isMissingLoginIdsTable(upsertError)) throw upsertError;
-    return;
-  }
-
-  const { error: retireError } = await supabaseClient
-    .from("login_ids")
-    .update({ auth_email: null, is_active: false })
-    .eq("user_id", user.id)
-    .neq("login_id", normalized);
-  if (retireError) {
-    if (required && isMissingLoginIdsTable(retireError)) {
-      throw new Error("ログインID管理テーブルが未設定です。supabase-schema.sql を Supabase に適用してください。");
-    }
-    if (required || !isMissingLoginIdsTable(retireError)) throw retireError;
-  }
-}
-
-async function handleAuthSubmit(event) {
-  event.preventDefault();
-  if (!supabaseClient) return;
-  const username = normalizeUsername(els.usernameInput.value);
-  const password = els.passwordInput.value;
-  if (!isValidUsername(username) || !password) {
-    els.authBadge.textContent = "ユーザー名またはパスワード未入力";
-    return;
-  }
-
-  const result = await signInWithUsername(username, password);
-  if (result.error) {
-    els.authBadge.textContent = result.error.message || "ログイン失敗";
-    return;
-  }
-
-  currentUser = result.data.user || result.data.session?.user || currentUser;
-  if (currentUser) {
-    const profile = await ensureProfile(currentUser, username);
-    await replaceLoginId(currentUser, profile.username, false);
-    state.profile = profile;
-  }
-
-  els.authBadge.textContent = "ログイン済み";
-  els.authForm.reset();
-  await loadAll();
-  render();
-}
-
-async function handleProfileSave(event) {
-  event.preventDefault();
-  if (!canUseRemote()) return;
-
-  const username = normalizeUsername(els.displayNameInput.value);
-  const password = els.newPasswordInput.value;
-  if (!isValidUsername(username)) {
-    els.menuStatus.textContent = "ユーザー名は英数字40文字以内";
-    return;
-  }
-  if (password && password.length < 6) {
-    els.menuStatus.textContent = "パスワードは6文字以上";
-    return;
-  }
-
-  try {
-    const profile = await ensureProfile(currentUser, username);
-    if (password) {
-      const { error } = await supabaseClient.auth.updateUser({ password });
-      if (error) throw error;
-    }
-    await replaceLoginId(currentUser, username, true);
-    const { data, error } = await supabaseClient
-      .from("profiles")
-      .update({ username })
-      .eq("id", currentUser.id)
-      .select("id, username")
-      .single();
-    if (error) throw error;
-    state.profile = data || { ...profile, username };
-    els.newPasswordInput.value = "";
-    renderAuth();
-    els.menuStatus.textContent = "保存しました。";
-  } catch (error) {
-    console.error(error);
-    els.menuStatus.textContent = "保存失敗";
-  }
-}
-
-async function signOut() {
-  if (!supabaseClient) return;
-  state.profile = null;
-  closeMenu();
-  await supabaseClient.auth.signOut();
 }
 
 function canUseRemote() {
@@ -581,654 +459,59 @@ async function loadAll() {
   if (canUseRemote()) {
     const loaded = await loadRemote();
     if (loaded) await seedDefaultRecipesIfNeeded();
-    return;
+  } else {
+    loadLocal();
+    await seedDefaultRecipesIfNeeded();
   }
-  loadLocal();
-  await seedDefaultRecipesIfNeeded();
 }
 
 async function loadRemote() {
-  const [
-    { data: recipes, error: recipesError },
-    { data: plan, error: planError },
-    { data: checks, error: checksError },
-    { data: profile, error: profileError },
-    { data: labels, error: labelsError }
-  ] =
-    await Promise.all([
-      supabaseClient.from("recipes").select("*").order("created_at", { ascending: false }),
-      supabaseClient.from("meal_plan_entries").select("*").order("plan_date", { ascending: true }),
-      supabaseClient.from("shopping_checks").select("*"),
-      supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle(),
-      supabaseClient.from("user_labels").select("*").order("position", { ascending: true }).order("created_at", { ascending: true })
-    ]);
-
-  if (recipesError || planError || checksError || profileError) {
-    console.error(recipesError || planError || checksError || profileError);
-    loadLocal();
-    return false;
-  }
-  if (labelsError) console.warn(labelsError);
-
-  state.recipes = recipes || [];
-  state.plan = plan || [];
-  state.checks = Object.fromEntries((checks || []).map((item) => [item.item_key, item.checked]));
-  state.labels = labelsError ? [] : (labels || []).map((item) => ({ id: item.id, name: item.name }));
-  state.profile = profile || (currentUser ? await ensureProfile(currentUser, emailLocalPart(currentUser.email)) : null);
-  if (currentUser && state.profile?.username) {
-    await replaceLoginId(currentUser, state.profile.username, false);
-  }
+  const [recipesResult, planResult, checksResult, profileResult] = await Promise.all([
+    supabaseClient.from("recipes").select("*").order("created_at", { ascending: false }),
+    supabaseClient.from("meal_plan_entries").select("*").order("plan_date", { ascending: true }),
+    supabaseClient.from("shopping_checks").select("*"),
+    supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle()
+  ]);
+  const error = recipesResult.error || planResult.error || checksResult.error || profileResult.error;
+  if (error) { console.error(error); loadLocal(); return false; }
+  state.recipes = recipesResult.data || [];
+  state.plan = planResult.data || [];
+  state.checks = Object.fromEntries((checksResult.data || []).map((item) => [item.item_key, item.checked]));
+  state.profile = profileResult.data || await ensureProfile(currentUser, emailLocalPart(currentUser.email));
+  if (state.profile?.username) await replaceLoginId(currentUser, state.profile.username, false);
   return true;
 }
 
 function loadLocal() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    state.recipes = [];
-    state.plan = [];
-    state.checks = {};
-    state.labels = [];
-    state.profile = null;
-    return;
-  }
-
+  const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!raw) { state.recipes = []; state.plan = []; state.checks = {}; state.profile = null; return; }
   try {
     const saved = JSON.parse(raw);
     state.recipes = saved.recipes || [];
     state.plan = saved.plan || [];
     state.checks = saved.checks || {};
-    state.labels = saved.labels || [];
     state.profile = saved.profile || null;
   } catch {
-    state.recipes = [];
-    state.plan = [];
-    state.checks = {};
-    state.labels = [];
-    state.profile = null;
+    state.recipes = []; state.plan = []; state.checks = {}; state.profile = null;
   }
 }
 
 function saveLocal() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      recipes: state.recipes,
-      plan: state.plan,
-      checks: state.checks,
-      labels: state.labels,
-      profile: state.profile
-    })
-  );
-}
-
-function shoppingOrderStorageKey() {
-  return `${SHOPPING_ORDER_STORAGE_KEY}:${currentUser?.id || "local"}`;
-}
-
-function loadShoppingOrders() {
-  try {
-    state.shoppingOrders = JSON.parse(localStorage.getItem(shoppingOrderStorageKey()) || "{}") || {};
-  } catch {
-    state.shoppingOrders = {};
-  }
-}
-
-function saveShoppingOrders() {
-  localStorage.setItem(shoppingOrderStorageKey(), JSON.stringify(state.shoppingOrders));
-}
-
-function render() {
-  renderAuth();
-  renderToday();
-  renderMobileNav();
-  renderRecipeFormState();
-  renderLabelControls();
-  renderRecipeSelect();
-  renderCalendar();
-  renderShoppingList();
-  renderRecipeList();
-  renderLabelSettings();
-  setupIcons();
-}
-
-function switchView(view) {
-  if (!["today", "shopping", "plan", "recipe", "labels"].includes(view)) return;
-  state.activeView = view;
-  renderMobileNav();
-  document.body.dataset.activeView = view;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function renderMobileNav() {
-  document.body.dataset.activeView = state.activeView;
-  if (!els.mobileNav) return;
-  els.mobileNav.querySelectorAll("[data-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.tab === state.activeView);
-  });
-}
-
-function renderLabelControls() {
-  const selectedRecipeLabel = els.recipeLabelInput.value;
-  const selectedFilter = els.labelFilter.value;
-  const options = state.labels
-    .map((label) => `<option value="${escapeHTML(label.name)}">${escapeHTML(label.name)}</option>`)
-    .join("");
-
-  els.recipeLabelInput.innerHTML = `<option value="">ラベルなし</option>${options}`;
-  els.labelFilter.innerHTML = `<option value="">すべてのラベル</option>${options}`;
-
-  if (state.labels.some((label) => label.name === selectedRecipeLabel)) {
-    els.recipeLabelInput.value = selectedRecipeLabel;
-  }
-  if (state.labels.some((label) => label.name === selectedFilter)) {
-    els.labelFilter.value = selectedFilter;
-  }
-}
-
-function renderAuth() {
-  if (!supabaseClient) {
-    els.authPanel.classList.add("hidden");
-    renderAccountMenu();
-    return;
-  }
-
-  els.authPanel.classList.toggle("hidden", !config.REQUIRE_AUTH || Boolean(currentUser));
-  els.signOutButton.classList.toggle("hidden", !currentUser);
-  els.profileForm.classList.toggle("hidden", !currentUser);
-  els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser?.email) || "";
-  els.authBadge.textContent = currentUser ? "" : "未ログイン";
-  renderAccountMenu();
-}
-
-function displayUsername() {
-  return state.profile?.username || emailLocalPart(currentUser?.email) || "ログイン済み";
-}
-
-function renderAccountMenu() {
-  if (!els.menuUserName) return;
-  els.menuUserName.textContent = currentUser ? displayUsername() : "未ログイン";
-  els.menuStatus.textContent = currentUser
-    ? "ユーザー名とパスワードを変更できます。"
-    : "ログイン後にアカウント設定を使えます。";
-  els.profileForm.classList.toggle("hidden", !currentUser);
-  els.signOutButton.classList.toggle("hidden", !currentUser);
-  if (currentUser) {
-    els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser.email) || "";
-  }
-}
-
-function renderToday() {
-  const today = new Date();
-  const todayISO = toISODate(today);
-  const todayEntry = state.plan.find((item) => item.plan_date === todayISO && item.meal_slot === "dinner");
-  const recipe = todayEntry ? state.recipes.find((item) => item.id === todayEntry.recipe_id) : null;
-
-  els.todayDateLabel.textContent = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-  els.todayMealTitle.textContent = recipe?.title || "未定";
-  els.todayMealMeta.textContent = recipe
-    ? [recipe.source_title, `${recipe.servings || 2}人分`].filter(Boolean).join(" / ")
-    : "献立タブで今日の料理を選べます。";
-
-  const ingredients = recipe?.ingredients || [];
-  renderQuickList(
-    els.todayIngredients,
-    ingredients.map((item) => ({
-      name: item.name,
-      amount: formatIngredientAmount(item)
-    })),
-    "材料はまだありません。"
-  );
-
-  const steps = recipe?.steps || [];
-  renderQuickList(
-    els.todaySteps,
-    steps.map((step, index) => ({ name: `${index + 1}. ${step}`, amount: "" })),
-    "作り方はまだありません。"
-  );
-}
-
-function renderQuickList(container, items, emptyText, footerText = "") {
-  container.innerHTML = "";
-  if (!items.length) {
-    container.innerHTML = `<div class="empty-state">${escapeHTML(emptyText)}</div>`;
-    return;
-  }
-
-  items.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "quick-list-item";
-    row.innerHTML = `
-      <span>${escapeHTML(item.name)}</span>
-      <span>${escapeHTML(item.amount || "")}</span>
-    `;
-    container.append(row);
-  });
-
-  if (footerText) {
-    const footer = document.createElement("div");
-    footer.className = "quick-list-more";
-    footer.textContent = footerText;
-    container.append(footer);
-  }
-}
-
-function renderRecipeFormState() {
-  els.recipeCount.textContent = `${state.recipes.length}件`;
-}
-
-function renderRecipeSelect() {
-  const selected = els.recipeSelect.value;
-  els.recipeSelect.innerHTML = "";
-
-  if (!state.recipes.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "レシピ未登録";
-    els.recipeSelect.append(option);
-    return;
-  }
-
-  state.recipes.forEach((recipe) => {
-    const option = document.createElement("option");
-    option.value = recipe.id;
-    option.textContent = recipe.title;
-    els.recipeSelect.append(option);
-  });
-
-  if (selected) els.recipeSelect.value = selected;
-}
-
-function renderCalendar() {
-  const month = state.monthCursor;
-  els.monthLabel.textContent = `${month.getFullYear()}年${month.getMonth() + 1}月`;
-  els.calendarGrid.innerHTML = "";
-
-  weekdays.forEach((day) => {
-    const header = document.createElement("div");
-    header.className = "weekday";
-    header.textContent = day;
-    els.calendarGrid.append(header);
-  });
-
-  const first = startOfWeek(startOfMonth(month));
-  const last = endOfWeek(endOfMonth(month));
-  for (let cursor = new Date(first); cursor <= last; cursor = addDays(cursor, 1)) {
-    const cell = document.createElement("button");
-    cell.type = "button";
-    cell.className = "day-cell";
-    if (cursor.getMonth() !== month.getMonth()) cell.classList.add("outside");
-
-    const iso = toISODate(cursor);
-    const entry = state.plan.find((item) => item.plan_date === iso && item.meal_slot === "dinner");
-    const recipe = entry ? state.recipes.find((item) => item.id === entry.recipe_id) : null;
-
-    cell.innerHTML = `
-      <span class="day-number">${cursor.getDate()}</span>
-      ${
-        recipe
-          ? `<span class="meal-chip">${escapeHTML(recipe.title)}</span>`
-          : `<span class="meal-empty">追加</span>`
-      }
-    `;
-    cell.addEventListener("click", () => setPlanForDate(iso));
-    els.calendarGrid.append(cell);
-  }
-}
-
-function renderShoppingList() {
-  const weekStart = state.weekCursor;
-  const weekEnd = addDays(weekStart, 6);
-  els.weekLabel.textContent = `${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}`;
-  els.shoppingList.innerHTML = "";
-
-  const items = getOrderedShoppingItems(weekStart);
-  if (!items.length) {
-    els.shoppingList.innerHTML = `<div class="empty-state">この週の献立は未登録です。</div>`;
-    return;
-  }
-
-  items.forEach((item, index) => {
-    const row = document.createElement("div");
-    row.className = `shopping-item ${state.checks[item.key] ? "checked" : ""}`;
-    row.innerHTML = `
-      <input type="checkbox" aria-label="${escapeHTML(item.name)}を購入済みにする" ${state.checks[item.key] ? "checked" : ""} />
-      <span class="item-name">${escapeHTML(item.name)}</span>
-      <span class="item-amount">${escapeHTML(item.amount)}</span>
-      <span class="shopping-order-actions">
-        <button class="order-button" type="button" aria-label="${escapeHTML(item.name)}を上へ移動" title="上へ" ${index === 0 ? "disabled" : ""}>↑</button>
-        <button class="order-button" type="button" aria-label="${escapeHTML(item.name)}を下へ移動" title="下へ" ${index === items.length - 1 ? "disabled" : ""}>↓</button>
-      </span>
-    `;
-    row.querySelector("input").addEventListener("change", (event) => {
-      toggleShoppingCheck(item.key, event.target.checked);
-    });
-    const [upButton, downButton] = row.querySelectorAll(".order-button");
-    upButton.addEventListener("click", () => moveShoppingItem(index, -1));
-    downButton.addEventListener("click", () => moveShoppingItem(index, 1));
-    els.shoppingList.append(row);
-  });
-}
-
-function getOrderedShoppingItems(weekStart) {
-  const items = getShoppingItems(weekStart);
-  const weekKey = toISODate(weekStart);
-  const savedOrder = state.shoppingOrders[weekKey] || [];
-  const positions = new Map(savedOrder.map((key, index) => [key, index]));
-
-  return items
-    .map((item, originalIndex) => ({ item, originalIndex }))
-    .sort((a, b) => {
-      const aPosition = positions.has(a.item.key) ? positions.get(a.item.key) : savedOrder.length + a.originalIndex;
-      const bPosition = positions.has(b.item.key) ? positions.get(b.item.key) : savedOrder.length + b.originalIndex;
-      return aPosition - bPosition;
-    })
-    .map(({ item }) => item);
-}
-
-function moveShoppingItem(index, delta) {
-  const items = getOrderedShoppingItems(state.weekCursor);
-  const targetIndex = index + delta;
-  if (targetIndex < 0 || targetIndex >= items.length) return;
-
-  [items[index], items[targetIndex]] = [items[targetIndex], items[index]];
-  state.shoppingOrders[toISODate(state.weekCursor)] = items.map((item) => item.key);
-  saveShoppingOrders();
-  renderShoppingList();
-}
-
-function renderRecipeList() {
-  const selectedTag = els.tagFilter.value;
-  const selectedLabel = els.labelFilter.value;
-  const recipes = state.recipes.filter((recipe) => {
-    const matchesTag = !selectedTag || (recipe.tags || []).includes(selectedTag);
-    const matchesLabel = !selectedLabel || recipe.label === selectedLabel;
-    return matchesTag && matchesLabel;
-  });
-
-  els.recipeList.innerHTML = "";
-  if (!recipes.length) {
-    els.recipeList.innerHTML = `<div class="empty-state">登録済みレシピはありません。</div>`;
-    return;
-  }
-
-  recipes.forEach((recipe) => {
-    const card = document.createElement("article");
-    card.className = "recipe-card";
-    card.innerHTML = `
-      <div>
-        <h3>${escapeHTML(recipe.title)}</h3>
-        <div class="recipe-meta">
-          <span>${recipe.servings || 2}人分</span>
-          ${recipe.source_title ? `<span>${escapeHTML(recipe.source_title)}</span>` : ""}
-        </div>
-      </div>
-      <div class="tag-row">
-        ${(recipe.tags || []).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
-        ${recipe.label ? `<span class="label">${escapeHTML(recipe.label)}</span>` : ""}
-      </div>
-      <button class="secondary-button" type="button">
-        編集
-      </button>
-    `;
-    card.querySelector("button").addEventListener("click", () => fillRecipeForm(recipe));
-    els.recipeList.append(card);
-  });
-}
-
-async function handleRecipeSave(event) {
-  event.preventDefault();
-
-  const recipe = {
-    id: els.recipeId.value || crypto.randomUUID(),
-    title: els.titleInput.value.trim(),
-    source_title: els.sourceInput.value.trim(),
-    servings: Number(els.servingsInput.value) || 2,
-    tags: els.tagsInput.value ? [els.tagsInput.value] : [],
-    label: els.recipeLabelInput.value,
-    ingredients: splitLines(els.ingredientsInput.value).map(parseIngredientLine),
-    steps: splitLines(els.stepsInput.value).map((step) => step.replace(/^\d+[.)、]\s*/, "")),
-    notes: ""
-  };
-
-  if (!recipe.title) return;
-
-  if (canUseRemote()) {
-    const payload = { ...recipe, user_id: currentUser?.id };
-    const { error } = await supabaseClient.from("recipes").upsert(payload);
-    if (error) {
-      console.error(error);
-      return;
-    }
-    await loadRemote();
-  } else {
-    const index = state.recipes.findIndex((item) => item.id === recipe.id);
-    if (index >= 0) state.recipes[index] = recipe;
-    else state.recipes.unshift(recipe);
-    saveLocal();
-  }
-
-  clearRecipeForm();
-  render();
-}
-
-function fillRecipeForm(recipe) {
-  els.recipeId.value = recipe.id;
-  els.titleInput.value = recipe.title || "";
-  els.sourceInput.value = recipe.source_title || "";
-  els.servingsInput.value = recipe.servings || 2;
-  els.tagsInput.value = (recipe.tags || []).find((tag) => tag === "主菜" || tag === "副菜") || "";
-  els.recipeLabelInput.value = recipe.label || "";
-  els.ingredientsInput.value = (recipe.ingredients || []).map(formatIngredient).join("\n");
-  els.stepsInput.value = (recipe.steps || []).map((step, index) => `${index + 1}. ${step}`).join("\n");
-  els.deleteRecipeButton.classList.remove("hidden");
-}
-
-function clearRecipeForm() {
-  els.recipeForm.reset();
-  els.recipeId.value = "";
-  els.servingsInput.value = 2;
-  els.tagsInput.value = "";
-  els.recipeLabelInput.value = "";
-  els.deleteRecipeButton.classList.add("hidden");
-}
-
-function renderLabelSettings() {
-  els.labelCount.textContent = `${state.labels.length} / ${MAX_LABELS}件`;
-  els.addLabelButton.disabled = state.labels.length >= MAX_LABELS;
-  els.labelNameInput.disabled = state.labels.length >= MAX_LABELS;
-  els.labelList.innerHTML = "";
-
-  if (!state.labels.length) {
-    els.labelList.innerHTML = `<div class="empty-state">ラベルはまだありません。</div>`;
-    return;
-  }
-
-  state.labels.forEach((label) => {
-    const row = document.createElement("div");
-    row.className = "label-list-item";
-    row.innerHTML = `
-      <span>${escapeHTML(label.name)}</span>
-      <button class="danger-button" type="button">削除</button>
-    `;
-    row.querySelector("button").addEventListener("click", () => deleteLabel(label));
-    els.labelList.append(row);
-  });
-}
-
-async function addLabel(event) {
-  event.preventDefault();
-  const name = els.labelNameInput.value.trim();
-  els.labelMessage.textContent = "";
-
-  if (!name) return;
-  if (state.labels.length >= MAX_LABELS) {
-    els.labelMessage.textContent = "ラベルは最大10件まで登録できます。";
-    return;
-  }
-  if (state.labels.some((label) => label.name === name)) {
-    els.labelMessage.textContent = "同じ名前のラベルが登録済みです。";
-    return;
-  }
-
-  const label = { id: crypto.randomUUID(), name };
-  if (canUseRemote()) {
-    const { error } = await supabaseClient.from("user_labels").insert({
-      ...label,
-      user_id: currentUser?.id,
-      position: state.labels.length
-    });
-    if (error) {
-      console.error(error);
-      els.labelMessage.textContent = "ラベルを追加できませんでした。";
-      return;
-    }
-    await loadRemote();
-  } else {
-    state.labels.push(label);
-    saveLocal();
-  }
-
-  els.labelForm.reset();
-  els.labelMessage.textContent = "ラベルを追加しました。";
-  render();
-}
-
-async function deleteLabel(label) {
-  if (canUseRemote()) {
-    const { error } = await supabaseClient.from("user_labels").delete().eq("id", label.id);
-    if (error) {
-      console.error(error);
-      els.labelMessage.textContent = "ラベルを削除できませんでした。";
-      return;
-    }
-
-    const { error: recipeError } = await supabaseClient
-      .from("recipes")
-      .update({ label: null })
-      .eq("label", label.name);
-    if (recipeError) console.error(recipeError);
-    await loadRemote();
-  } else {
-    state.labels = state.labels.filter((item) => item.id !== label.id);
-    state.recipes.forEach((recipe) => {
-      if (recipe.label === label.name) recipe.label = "";
-    });
-    saveLocal();
-  }
-
-  els.labelMessage.textContent = "ラベルを削除しました。";
-  render();
-}
-
-async function deleteSelectedRecipe() {
-  const id = els.recipeId.value;
-  if (!id) return;
-
-  if (canUseRemote()) {
-    await supabaseClient.from("recipes").delete().eq("id", id);
-    await loadRemote();
-  } else {
-    state.recipes = state.recipes.filter((recipe) => recipe.id !== id);
-    state.plan = state.plan.filter((entry) => entry.recipe_id !== id);
-    saveLocal();
-  }
-
-  clearRecipeForm();
-  render();
-}
-
-function parseEbookText() {
-  const parsed = parseRecipeText(els.ebookInput.value);
-  if (!parsed.title) {
-    els.parseResult.textContent = "料理名を抽出できませんでした。";
-    return;
-  }
-
-  els.titleInput.value = parsed.title;
-  els.sourceInput.value = parsed.source_title || "";
-  els.servingsInput.value = parsed.servings || 2;
-  els.ingredientsInput.value = parsed.ingredients.map(formatIngredient).join("\n");
-  els.stepsInput.value = parsed.steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
-  els.parseResult.textContent = `${parsed.ingredients.length}材料、${parsed.steps.length}行程を抽出しました。`;
-}
-
-async function importPdfFile() {
-  const file = els.pdfInput.files?.[0];
-  if (!file) {
-    els.parseResult.textContent = "PDFファイルを選択してください。";
-    return;
-  }
-  if (file.type && file.type !== "application/pdf") {
-    els.parseResult.textContent = "PDFファイルを選択してください。";
-    return;
-  }
-
-  const knownBook = window.HOTCOOK_RECIPE_BOOK;
-  if (knownBook?.filenamePattern?.test(file.name)) {
-    await importKnownRecipeBook(knownBook);
-    return;
-  }
-
-  els.parseResult.textContent = "PDFを読み込んでいます。";
-  try {
-    const text = await extractPdfText(file);
-    if (!text.trim()) {
-      els.parseResult.textContent = "PDFからテキストを抽出できませんでした。";
-      return;
-    }
-    els.ebookInput.value = text;
-    parseEbookText();
-  } catch (error) {
-    console.error(error);
-    els.parseResult.textContent = "PDF読込に失敗しました。";
-  }
-}
-
-async function importKnownRecipeBook(book) {
-  els.parseResult.textContent = `${book.title}の全メニューを登録しています。`;
-  const recipes = createBookRecipes(book, new Set(state.recipes.map((recipe) => recipe.title)));
-
-  if (!recipes.length) {
-    els.parseResult.textContent = `${book.title}の全${book.recipes.length}件は登録済みです。`;
-    return;
-  }
-
-  if (canUseRemote()) {
-    const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser?.id }));
-    const { error } = await supabaseClient.from("recipes").insert(payload);
-    if (error) {
-      console.error(error);
-      els.parseResult.textContent = "一括登録に失敗しました。";
-      return;
-    }
-    await loadRemote();
-  } else {
-    state.recipes = [...recipes, ...state.recipes];
-    saveLocal();
-  }
-
-  localStorage.setItem(defaultRecipeSeedStorageKey(), "1");
-  render();
-  const skipped = book.recipes.length - recipes.length;
-  els.parseResult.textContent = skipped
-    ? `${recipes.length}件を登録しました（登録済み${skipped}件はスキップ）。`
-    : `全${recipes.length}件を登録しました。`;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ recipes: state.recipes, plan: state.plan, checks: state.checks, profile: state.profile }));
 }
 
 function createBookRecipes(book, existingTitles = new Set()) {
-  return book.recipes
-    .filter((recipe) => !existingTitles.has(recipe.title))
-    .map((recipe) => ({
-      id: crypto.randomUUID(),
-      title: recipe.title,
-      source_title: `${book.title} p.${recipe.page}`,
-      servings: recipe.servings || 4,
-      tags: recipe.tags || [],
-      label: "",
-      ingredients: (recipe.ingredients || []).map(parseIngredientLine),
-      steps: recipe.steps || [],
-      notes: ""
-    }));
+  return book.recipes.filter((recipe) => !existingTitles.has(recipe.title)).map((recipe) => ({
+    id: crypto.randomUUID(),
+    title: recipe.title,
+    source_title: `${book.title} p.${recipe.page}`,
+    servings: recipe.servings || 4,
+    tags: recipe.tags || [],
+    label: "",
+    ingredients: (recipe.ingredients || []).map(parseIngredientLine),
+    steps: recipe.steps || [],
+    notes: ""
+  }));
 }
 
 function defaultRecipeSeedStorageKey() {
@@ -1239,377 +522,220 @@ async function seedDefaultRecipesIfNeeded() {
   const book = window.HOTCOOK_RECIPE_BOOK;
   const markerKey = defaultRecipeSeedStorageKey();
   if (!book || localStorage.getItem(markerKey)) return;
-
   const recipes = createBookRecipes(book, new Set(state.recipes.map((recipe) => recipe.title)));
   if (canUseRemote()) {
-    const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser?.id }));
-    if (payload.length) {
+    if (recipes.length) {
+      const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser.id }));
       const { data, error } = await supabaseClient.from("recipes").insert(payload).select("*");
-      if (error) {
-        console.error(error);
-        return;
-      }
+      if (error) { console.error(error); return; }
       state.recipes = [...(data || recipes), ...state.recipes];
     }
-  } else {
-    if (recipes.length) {
-      state.recipes = [...recipes, ...state.recipes];
-      saveLocal();
-    }
+  } else if (recipes.length) {
+    state.recipes = [...recipes, ...state.recipes];
+    saveLocal();
   }
-
   localStorage.setItem(markerKey, "1");
 }
 
-async function extractPdfText(file) {
-  await loadPdfLibrary();
-  const buffer = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
-  const pages = [];
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const lines = groupPdfTextItems(content.items || []);
-    pages.push(lines.join("\n"));
+function renderAuth() {
+  const requiresLogin = Boolean(supabaseClient && config.REQUIRE_AUTH && !currentUser);
+  els.authPanel.classList.toggle("hidden", !requiresLogin);
+  els.appContent.classList.toggle("hidden", requiresLogin);
+  els.authBadge.textContent = requiresLogin ? "" : currentUser ? "ログイン済み" : "";
+}
+
+function toggleMenu() {
+  if (els.appMenu.classList.contains("hidden")) openMenu(); else closeMenu();
+}
+
+function openMenu() {
+  els.appMenu.classList.remove("hidden");
+  els.menuOverlay.classList.remove("hidden");
+  els.appMenu.setAttribute("aria-hidden", "false");
+  els.menuButton.setAttribute("aria-expanded", "true");
+}
+
+function closeMenu() {
+  els.appMenu.classList.add("hidden");
+  els.menuOverlay.classList.add("hidden");
+  els.appMenu.setAttribute("aria-hidden", "true");
+  els.menuButton.setAttribute("aria-expanded", "false");
+}
+
+function renderAccountMenu() {
+  els.menuUserName.textContent = currentUser ? displayUsername() : "未ログイン";
+  els.menuStatus.textContent = currentUser ? "ユーザー名とパスワードを変更できます。" : supabaseClient ? "ログインしてください。" : "この端末にデータを保存しています。";
+  els.profileForm.classList.toggle("hidden", !currentUser);
+  els.signOutButton.classList.toggle("hidden", !currentUser);
+  if (currentUser) els.displayNameInput.value = state.profile?.username || emailLocalPart(currentUser.email) || "";
+}
+
+function normalizeUsername(value) {
+  return String(value || "").trim().toLowerCase().replace(/^@+/, "").replace(/[^a-z0-9._-]/g, "");
+}
+
+function isValidUsername(value) { return USERNAME_PATTERN.test(normalizeUsername(value)); }
+function usernameToEmail(username) { return `${normalizeUsername(username) || "user"}@${INTERNAL_EMAIL_DOMAIN}`; }
+function usernameToLegacyEmail(username) { return `${normalizeUsername(username) || "user"}@${LEGACY_EMAIL_DOMAIN}`; }
+function emailLocalPart(email) { return normalizeUsername(String(email || "").split("@")[0]); }
+function displayUsername() { return state.profile?.username || emailLocalPart(currentUser?.email) || "ログイン済み"; }
+
+function isMissingLoginIdsTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return error?.code === "42P01" || error?.code === "PGRST205" || message.includes("login_ids");
+}
+
+async function lookupLoginId(username) {
+  try {
+    const { data, error } = await supabaseClient.from("login_ids").select("auth_email, is_active, user_id").eq("login_id", normalizeUsername(username)).maybeSingle();
+    if (error) throw error;
+    if (!data) return { email: null, blocked: false, currentLoginId: "" };
+    if (data.is_active) return { email: data.auth_email, blocked: false, currentLoginId: "" };
+    const { data: activeRows, error: activeError } = await supabaseClient.from("login_ids").select("login_id").eq("user_id", data.user_id).eq("is_active", true).limit(1);
+    if (activeError) throw activeError;
+    return { email: null, blocked: true, currentLoginId: activeRows?.[0]?.login_id || "" };
+  } catch (error) {
+    if (!isMissingLoginIdsTable(error)) console.warn(error);
+    return { email: null, blocked: false, currentLoginId: "" };
   }
-  return pages.join("\n\n").trim();
 }
 
-async function loadPdfLibrary() {
-  if (window.pdfjsLib) return;
-  const version = "3.11.174";
-  await loadScript(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.min.js`, "pdfjs-lib");
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
-}
-
-function groupPdfTextItems(items) {
-  const rows = [];
-  items.forEach((item) => {
-    const value = String(item.str || "").trim();
-    if (!value) return;
-    const y = Math.round((item.transform?.[5] || 0) * 10) / 10;
-    let row = rows.find((entry) => Math.abs(entry.y - y) < 2);
-    if (!row) {
-      row = { y, items: [] };
-      rows.push(row);
-    }
-    row.items.push({ x: item.transform?.[4] || 0, value });
-  });
-
-  return rows
-    .sort((a, b) => b.y - a.y)
-    .map((row) =>
-      row.items
-        .sort((a, b) => a.x - b.x)
-        .map((item) => item.value)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-    )
-    .filter(Boolean);
-}
-
-async function seedSamples() {
-  const existingTitles = new Set(state.recipes.map((recipe) => recipe.title));
-  const inserts = sampleRecipes
-    .filter((recipe) => !existingTitles.has(recipe.title))
-    .map((recipe) => ({ ...recipe, id: crypto.randomUUID() }));
-
-  if (!inserts.length) return;
-
-  if (canUseRemote()) {
-    const payload = inserts.map((recipe) => ({ ...recipe, user_id: currentUser?.id }));
-    const { error } = await supabaseClient.from("recipes").insert(payload);
-    if (error) {
-      console.error(error);
-      return;
-    }
-    await loadRemote();
-  } else {
-    state.recipes = [...inserts, ...state.recipes];
-    saveLocal();
+async function signInWithUsername(username, password) {
+  const normalized = normalizeUsername(username);
+  if (!isValidUsername(normalized)) return { error: new Error("ユーザー名の形式が正しくありません。") };
+  const loginId = await lookupLoginId(normalized);
+  if (loginId.blocked) return { error: new Error(loginId.currentLoginId ? `現在のユーザー名: ${loginId.currentLoginId}` : "ユーザー名が変更済みです。") };
+  const emails = [loginId.email, usernameToEmail(normalized), usernameToLegacyEmail(normalized)].filter(Boolean);
+  let lastError = null;
+  for (const email of [...new Set(emails)]) {
+    const result = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (!result.error) return result;
+    lastError = result.error;
   }
+  return { error: lastError || new Error("ログインできませんでした。") };
+}
 
+async function getProfile(user) {
+  const { data, error } = await supabaseClient.from("profiles").select("id, username").eq("id", user.id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function ensureProfile(user, username) {
+  const profile = await getProfile(user);
+  if (profile) return profile;
+  const nextUsername = normalizeUsername(username) || emailLocalPart(user.email) || "user";
+  const { data, error } = await supabaseClient.from("profiles").insert({ id: user.id, username: nextUsername }).select("id, username").single();
+  if (error) throw error;
+  return data;
+}
+
+async function replaceLoginId(user, loginId, required) {
+  const normalized = normalizeUsername(loginId);
+  if (!normalized) return;
+  const row = { login_id: normalized, user_id: user.id, auth_email: user.email || usernameToEmail(normalized), is_active: true };
+  const { error: upsertError } = await supabaseClient.from("login_ids").upsert(row, { onConflict: "login_id" });
+  if (upsertError) {
+    if (required && isMissingLoginIdsTable(upsertError)) throw new Error("ログインID管理テーブルが未設定です。");
+    if (required || !isMissingLoginIdsTable(upsertError)) throw upsertError;
+    return;
+  }
+  const { error: retireError } = await supabaseClient.from("login_ids").update({ auth_email: null, is_active: false }).eq("user_id", user.id).neq("login_id", normalized);
+  if (retireError && (required || !isMissingLoginIdsTable(retireError))) throw retireError;
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const username = normalizeUsername(els.usernameInput.value);
+  const password = els.passwordInput.value;
+  if (!username || !password) { els.authBadge.textContent = "ユーザー名とパスワードを入力してください。"; return; }
+  els.authBadge.textContent = "ログインしています…";
+  const result = await signInWithUsername(username, password);
+  if (result.error) { els.authBadge.textContent = result.error.message || "ログインできませんでした。"; return; }
+  currentUser = result.data.user || result.data.session?.user || currentUser;
+  if (currentUser) {
+    const profile = await ensureProfile(currentUser, username);
+    await replaceLoginId(currentUser, profile.username, false);
+    state.profile = profile;
+  }
+  els.authForm.reset();
+  await loadAll();
   render();
 }
 
-async function setPlanForDate(isoDate) {
-  const recipeId = els.recipeSelect.value;
-  if (!recipeId) return;
-
-  const entry = {
-    id: crypto.randomUUID(),
-    plan_date: isoDate,
-    meal_slot: "dinner",
-    recipe_id: recipeId
-  };
-
-  if (canUseRemote()) {
-    const { error } = await supabaseClient
-      .from("meal_plan_entries")
-      .upsert({ ...entry, user_id: currentUser?.id }, { onConflict: "user_id,plan_date,meal_slot" });
-    if (error) {
-      console.error(error);
-      return;
+async function handleProfileSave(event) {
+  event.preventDefault();
+  if (!canUseRemote()) return;
+  const username = normalizeUsername(els.displayNameInput.value);
+  const password = els.newPasswordInput.value;
+  if (!isValidUsername(username)) { els.menuStatus.textContent = "ユーザー名は英数字40文字以内です。"; return; }
+  if (password && password.length < 6) { els.menuStatus.textContent = "パスワードは6文字以上です。"; return; }
+  try {
+    if (password) {
+      const { error } = await supabaseClient.auth.updateUser({ password });
+      if (error) throw error;
     }
-    await loadRemote();
-  } else {
-    state.plan = state.plan.filter((item) => !(item.plan_date === isoDate && item.meal_slot === "dinner"));
-    state.plan.push(entry);
-    saveLocal();
+    await replaceLoginId(currentUser, username, true);
+    const { data, error } = await supabaseClient.from("profiles").update({ username }).eq("id", currentUser.id).select("id, username").single();
+    if (error) throw error;
+    state.profile = data;
+    els.newPasswordInput.value = "";
+    renderAccountMenu();
+    els.menuStatus.textContent = "保存しました。";
+  } catch (error) {
+    console.error(error);
+    els.menuStatus.textContent = "保存できませんでした。";
   }
-
-  render();
 }
 
-async function suggestMonthPlan() {
-  if (!state.recipes.length) return;
-
-  const start = startOfMonth(state.monthCursor);
-  const end = endOfMonth(state.monthCursor);
-  const entries = [];
-  let index = 0;
-
-  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
-    const recipe = state.recipes[index % state.recipes.length];
-    entries.push({
-      id: crypto.randomUUID(),
-      plan_date: toISODate(cursor),
-      meal_slot: "dinner",
-      recipe_id: recipe.id
-    });
-    index += cursor.getDay() === 0 ? 2 : 1;
-  }
-
-  if (canUseRemote()) {
-    await supabaseClient
-      .from("meal_plan_entries")
-      .delete()
-      .gte("plan_date", toISODate(start))
-      .lte("plan_date", toISODate(end))
-      .eq("meal_slot", "dinner");
-    const { error } = await supabaseClient
-      .from("meal_plan_entries")
-      .insert(entries.map((entry) => ({ ...entry, user_id: currentUser?.id })));
-    if (error) {
-      console.error(error);
-      return;
-    }
-    await loadRemote();
-  } else {
-    state.plan = state.plan.filter((item) => item.plan_date < toISODate(start) || item.plan_date > toISODate(end));
-    state.plan.push(...entries);
-    saveLocal();
-  }
-
-  render();
-}
-
-async function toggleShoppingCheck(key, checked) {
-  state.checks[key] = checked;
-
-  if (canUseRemote()) {
-    const { error } = await supabaseClient.from("shopping_checks").upsert(
-      {
-        user_id: currentUser?.id,
-        week_start: toISODate(state.weekCursor),
-        item_key: key,
-        checked
-      },
-      { onConflict: "user_id,week_start,item_key" }
-    );
-    if (error) console.error(error);
-  } else {
-    saveLocal();
-  }
-
-  renderShoppingList();
-  renderToday();
-}
-
-function getShoppingItems(weekStart) {
-  const weekDates = new Set(Array.from({ length: 7 }, (_, index) => toISODate(addDays(weekStart, index))));
-  return getShoppingItemsForDates(weekStart, weekDates);
-}
-
-function getShoppingItemsForDates(weekStart, dates) {
-  const entries = state.plan.filter((entry) => dates.has(entry.plan_date));
-  const bucket = new Map();
-
-  entries.forEach((entry) => {
-    const recipe = state.recipes.find((item) => item.id === entry.recipe_id);
-    if (!recipe) return;
-
-    (recipe.ingredients || []).forEach((ingredient) => {
-      const name = normalizeIngredientName(ingredient.name);
-      if (!name) return;
-      const unit = ingredient.unit || "";
-      const key = `${toISODate(weekStart)}:${name}:${unit}`;
-      const current = bucket.get(key) || { key, name, unit, quantity: 0, raw: [] };
-      if (typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity)) {
-        current.quantity += ingredient.quantity;
-      } else {
-        current.raw.push(formatIngredient(ingredient));
-      }
-      bucket.set(key, current);
-    });
-  });
-
-  return Array.from(bucket.values())
-    .map((item) => ({
-      key: item.key,
-      name: item.name,
-      amount: item.quantity ? `${roundQuantity(item.quantity)}${item.unit}` : item.raw.join(" / ")
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name, "ja"));
-}
-
-function formatIngredientAmount(ingredient) {
-  if (!ingredient) return "";
-  const quantity = typeof ingredient.quantity === "number" ? roundQuantity(ingredient.quantity) : "";
-  return [quantity ? `${quantity}${ingredient.unit || ""}` : "", ingredient.note].filter(Boolean).join(" ");
-}
-
-function parseRecipeText(text) {
-  const lines = splitLines(text);
-  const title = lines[0] || "";
-  const servingsMatch = text.match(/(\d+)\s*人分/);
-  const ingredientsIndex = lines.findIndex((line) => /材料|ingredients/i.test(line));
-  const stepsIndex = lines.findIndex((line) => /作り方|手順|行程|作法|steps/i.test(line));
-  const ingredientLines = lines.slice(
-    ingredientsIndex >= 0 ? ingredientsIndex + 1 : 1,
-    stepsIndex >= 0 ? stepsIndex : lines.length
-  );
-  const stepLines = stepsIndex >= 0 ? lines.slice(stepsIndex + 1) : [];
-
-  return {
-    title: title.replace(/^[#\s]+/, ""),
-    source_title: "",
-    servings: servingsMatch ? Number(servingsMatch[1]) : 2,
-    tags: [],
-    ingredients: ingredientLines
-      .filter((line) => !/^\(?\d+\s*人分\)?$/.test(line))
-      .map(parseIngredientLine)
-      .filter((item) => item.name),
-    steps: stepLines.map((line) => line.replace(/^\d+[.)、]\s*/, "")).filter(Boolean)
-  };
+async function signOut() {
+  closeMenu();
+  if (supabaseClient) await supabaseClient.auth.signOut();
 }
 
 function parseIngredientLine(line) {
   const normalized = String(line || "").trim().replace(/\s+/g, " ");
   if (!normalized) return { name: "", quantity: null, unit: "", note: "" };
-
   const match = normalized.match(/^(.+?)\s+([0-9０-９./]+(?:\s*\/\s*[0-9０-９.]+)?)(g|kg|ml|l|L|cc|個|本|枚|切れ|袋|丁|束|パック|株|缶|箱|かけ|合|玉|大さじ|小さじ|カップ)?(?:\s*(.*))?$/);
   if (!match) {
     const spoonMatch = normalized.match(/^(.+?)\s+(大さじ|小さじ|カップ)([0-9０-９./]+)(.*)$/);
-    if (spoonMatch) {
-      return {
-        name: spoonMatch[1].trim(),
-        quantity: parseJapaneseNumber(spoonMatch[3]),
-        unit: spoonMatch[2],
-        note: spoonMatch[4].trim()
-      };
-    }
+    if (spoonMatch) return { name: spoonMatch[1].trim(), quantity: parseJapaneseNumber(spoonMatch[3]), unit: spoonMatch[2], note: spoonMatch[4].trim() };
     return { name: normalized, quantity: null, unit: "", note: "" };
   }
-
-  return {
-    name: match[1].trim(),
-    quantity: parseJapaneseNumber(match[2]),
-    unit: match[3] || "",
-    note: (match[4] || "").trim()
-  };
+  return { name: match[1].trim(), quantity: parseJapaneseNumber(match[2]), unit: match[3] || "", note: (match[4] || "").trim() };
 }
 
 function parseJapaneseNumber(value) {
   const half = String(value || "").replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0));
-  if (half.includes("/")) {
-    const parts = half.split("/").map(Number);
-    if (parts.length === 2 && parts[1]) return parts[0] / parts[1];
-  }
-  const num = Number(half);
-  return Number.isFinite(num) ? num : null;
+  if (half.includes("/")) { const parts = half.split("/").map(Number); if (parts.length === 2 && parts[1]) return parts[0] / parts[1]; }
+  const number = Number(half);
+  return Number.isFinite(number) ? number : null;
+}
+
+function formatIngredientAmount(ingredient) {
+  const quantity = typeof ingredient?.quantity === "number" ? roundQuantity(ingredient.quantity) : "";
+  return [quantity !== "" ? `${quantity}${ingredient.unit || ""}` : "", ingredient?.note].filter(Boolean).join(" ");
 }
 
 function formatIngredient(ingredient) {
-  if (!ingredient) return "";
-  const quantity = typeof ingredient.quantity === "number" ? roundQuantity(ingredient.quantity) : "";
-  return [ingredient.name, `${quantity}${ingredient.unit || ""}`, ingredient.note].filter(Boolean).join(" ");
+  return [ingredient?.name, formatIngredientAmount(ingredient)].filter(Boolean).join(" ");
 }
 
-function normalizeIngredientName(name) {
-  return String(name || "").trim().replace(/\s+/g, " ");
-}
+function normalizeIngredientName(name) { return String(name || "").trim().replace(/\s+/g, " "); }
+function roundQuantity(value) { return Math.round(value * 100) / 100; }
+function startOfWeek(date) { const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate()); copy.setDate(copy.getDate() - copy.getDay()); return copy; }
+function addDays(date, days) { const copy = new Date(date); copy.setDate(copy.getDate() + days); return copy; }
+function toISODate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
+function isDateInWeek(iso, start) { return iso >= toISODate(start) && iso <= toISODate(addDays(start, 6)); }
+function formatWeekRange(start, end) { return `${start.getFullYear()}年${start.getMonth() + 1}月${start.getDate()}日（日）〜 ${end.getMonth() + 1}月${end.getDate()}日（土）`; }
 
-function splitLines(value) {
-  return String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function splitLinesOrComma(value) {
-  return String(value || "")
-    .split(/[,\n、]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function moveMonth(delta) {
-  state.monthCursor = startOfMonth(new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + delta, 1));
-  renderCalendar();
-}
-
-function moveWeek(delta) {
-  state.weekCursor = addDays(state.weekCursor, delta * 7);
-  renderShoppingList();
-}
-
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
-
-function startOfWeek(date) {
-  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = copy.getDay() || 7;
-  copy.setDate(copy.getDate() - day + 1);
-  return copy;
-}
-
-function endOfWeek(date) {
-  return addDays(startOfWeek(date), 6);
-}
-
-function addDays(date, days) {
-  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function toISODate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatShortDate(date) {
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function roundQuantity(value) {
-  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+function showToast(message) {
+  els.toast.textContent = message;
+  els.toast.classList.remove("hidden");
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => els.toast.classList.add("hidden"), 2600);
 }
 
 function escapeHTML(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 }

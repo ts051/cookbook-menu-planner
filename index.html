@@ -3,284 +3,122 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4eadb" />
-    <title>Cookbook Menu Planner</title>
-    <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=icons-20260708" />
+    <meta name="theme-color" content="#fffaf2" />
+    <meta name="description" content="ホットクックのレシピを選び、1週間の献立と買い物リストをまとめるアプリ" />
+    <title>きょうのこんだて</title>
+    <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=20260908" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260907-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260908-1" />
     <script src="./supabase-config.js"></script>
-    <script defer src="./hotcook-recipes.js?v=20260907-1"></script>
-    <script defer src="./app.js?v=20260907-1"></script>
+    <script defer src="./hotcook-recipes.js?v=20260908-1"></script>
+    <script defer src="./app.js?v=20260908-1"></script>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="hero">
-        <img src="./assets/cookbook-worktop.png" alt="" />
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-          <div class="status-row">
-            <button id="menuButton" class="menu-button" type="button" aria-controls="appMenu" aria-expanded="false">
-              <span class="hamburger-lines" aria-hidden="true"></span>
-              <span class="menu-button-label">メニュー</span>
-            </button>
-            <h1>きょうのこんだて</h1>
-            <span id="storageBadge" class="hidden">Local</span>
-          </div>
-        </div>
-      </header>
+    <header class="site-header">
+      <div class="header-inner">
+        <button id="menuButton" class="icon-button menu-button" type="button" aria-label="アカウントメニューを開く" aria-controls="appMenu" aria-expanded="false"><span class="hamburger" aria-hidden="true"></span></button>
+        <button class="brand" type="button" data-view-link="home" aria-label="メインページへ"><span class="brand-mark">⌂</span><span>きょうのこんだて</span></button>
+        <nav class="desktop-nav" aria-label="メインナビゲーション">
+          <button class="nav-button active" type="button" data-view-link="home">メニュー</button>
+          <button class="nav-button" type="button" data-view-link="week">1週間メニュー</button>
+          <button class="nav-button" type="button" data-view-link="shopping">買い物</button>
+        </nav>
+        <span id="storageBadge" class="storage-badge">Local</span>
+      </div>
+    </header>
 
-      <div id="menuOverlay" class="menu-overlay hidden"></div>
-      <aside id="appMenu" class="app-menu hidden" aria-hidden="true">
-        <div class="menu-header">
-          <div>
-            <span class="today-label">アカウント</span>
-            <strong id="menuUserName">未ログイン</strong>
-          </div>
-          <button id="menuCloseButton" class="icon-button" type="button" title="閉じる">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-        <div id="menuStatus" class="menu-status"></div>
-        <div class="menu-actions">
-          <button id="labelSettingsButton" class="secondary-button" type="button">ラベル設定</button>
-          <button id="seedButton" class="secondary-button" type="button">DBサンプル投入</button>
-          <button id="syncButton" class="secondary-button" type="button">再読込</button>
-        </div>
-        <form id="profileForm" class="menu-form hidden">
-          <label>
-            ユーザー名
-            <input id="displayNameInput" type="text" autocomplete="username" maxlength="40" placeholder="ユーザー名" required />
-          </label>
-          <label>
-            新しいパスワード
-            <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="変更しない場合は空欄" />
-          </label>
-          <button class="secondary-button" type="submit">
-            保存
-          </button>
+    <div id="menuOverlay" class="menu-overlay hidden"></div>
+    <aside id="appMenu" class="account-drawer hidden" aria-hidden="true">
+      <div class="drawer-header">
+        <div><span class="eyebrow">アカウント</span><strong id="menuUserName">未ログイン</strong></div>
+        <button id="menuCloseButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+      </div>
+      <p id="menuStatus" class="drawer-message"></p>
+      <form id="profileForm" class="drawer-form hidden">
+        <label>ユーザー名<input id="displayNameInput" type="text" autocomplete="username" maxlength="40" required /></label>
+        <label>新しいパスワード<input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="変更しない場合は空欄" /></label>
+        <button class="secondary-button" type="submit">設定を保存</button>
+      </form>
+      <button id="syncButton" class="secondary-button" type="button">最新データを読み込む</button>
+      <button id="signOutButton" class="secondary-button hidden" type="button">ログアウト</button>
+    </aside>
+
+    <main class="page-shell">
+      <section id="authPanel" class="auth-card hidden">
+        <div><span class="eyebrow">MEMBERS ONLY</span><h1>ログイン</h1><p>登録済みのユーザー名とパスワードを入力してください。</p></div>
+        <form id="authForm" class="auth-form">
+          <label>ユーザー名<input id="usernameInput" type="text" autocomplete="username" maxlength="40" required /></label>
+          <label>パスワード<input id="passwordInput" type="password" autocomplete="current-password" required /></label>
+          <button class="primary-button" type="submit">ログイン</button>
+          <span id="authBadge" class="form-message" aria-live="polite"></span>
         </form>
-        <button id="signOutButton" class="secondary-button hidden" type="button">
-          ログアウト
-        </button>
-      </aside>
+      </section>
 
-      <main class="workspace">
-        <section id="authPanel" class="auth-panel">
-          <div>
-            <h2>ログイン</h2>
-            <p>登録済みユーザーのみデータを同期します。</p>
-            <span id="authBadge" class="auth-message">未ログイン</span>
+      <div id="appContent">
+        <section class="app-view" data-view="home">
+          <div class="page-intro">
+            <div><span class="eyebrow">HOTCOOK RECIPE BOOK</span><h1>今週、何をつくる？</h1><p>気になる料理にチェックを入れて、1週間のメニューに追加できます。</p></div>
+            <button id="openWeekButton" class="week-summary" type="button"><span>今週の予定</span><strong id="plannedMealCount">0</strong><small>件</small></button>
           </div>
-          <form id="authForm" class="auth-form">
-            <input id="usernameInput" type="text" autocomplete="username" maxlength="40" placeholder="ユーザー名" required />
-            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="パスワード" required />
-            <button class="primary-button" type="submit">
-              <i data-lucide="key-round"></i>
-              ログイン
-            </button>
-          </form>
+          <div id="selectionTray" class="selection-tray" aria-live="polite">
+            <div><strong><span id="selectedCount">0</span>件選択中</strong><span id="selectionHint">料理のチェックボックスを選んでください</span></div>
+            <button id="clearSelectionButton" class="text-button hidden" type="button">選択解除</button>
+            <button id="scheduleSelectionButton" class="primary-button" type="button" disabled>1週間メニューに追加</button>
+          </div>
+          <div id="genreContainer" class="genre-container"></div>
         </section>
 
-        <section id="todayPanel" class="panel today-panel app-view" data-view="today">
-          <div class="panel-heading">
-            <div>
-              <h2>きょうのこんだて</h2>
-              <span id="todayDateLabel" class="subtle"></span>
-            </div>
+        <section class="app-view hidden" data-view="week">
+          <div class="view-heading">
+            <div><span class="eyebrow">WEEKLY MENU</span><h1>1週間メニュー</h1><p id="weekRange"></p></div>
+            <div class="week-controls"><button id="prevWeekButton" class="icon-button" type="button" aria-label="前の週">‹</button><button id="currentWeekButton" class="secondary-button" type="button">今週</button><button id="nextWeekButton" class="icon-button" type="button" aria-label="次の週">›</button></div>
           </div>
-          <div class="today-grid">
-            <div class="today-meal">
-              <span class="today-label">作るもの</span>
-              <strong id="todayMealTitle">未定</strong>
-              <span id="todayMealMeta" class="subtle"></span>
-            </div>
-            <div>
-              <span class="today-label">材料</span>
-              <div id="todayIngredients" class="quick-list"></div>
-            </div>
-            <div>
-              <span class="today-label">作り方</span>
-              <div id="todaySteps" class="quick-list"></div>
-            </div>
-          </div>
+          <div id="weeklyGrid" class="weekly-grid"></div>
         </section>
 
-        <section class="dashboard-grid">
-          <div class="panel recipe-panel app-view" data-view="recipe">
-            <div class="panel-heading">
-              <div>
-                <h2>レシピDB</h2>
-                <span id="recipeCount" class="subtle"></span>
-              </div>
+        <section class="app-view hidden" data-view="shopping">
+          <div class="view-heading shopping-heading">
+            <div><span class="eyebrow">SHOPPING LIST</span><h1>買い物リスト</h1><p id="shoppingWeekRange"></p></div>
+            <div class="shopping-heading-actions">
+              <div class="week-controls"><button id="prevShoppingWeekButton" class="icon-button" type="button" aria-label="前の週">‹</button><button id="currentShoppingWeekButton" class="secondary-button" type="button">今週</button><button id="nextShoppingWeekButton" class="icon-button" type="button" aria-label="次の週">›</button></div>
+              <div class="shopping-progress"><strong id="shoppingProgress">0 / 0</strong><span>チェック済み</span></div>
             </div>
-
-            <form id="recipeForm" class="recipe-form">
-              <input id="recipeId" type="hidden" />
-              <label>
-                料理名
-                <input id="titleInput" type="text" placeholder="鮭の南蛮漬け" required />
-              </label>
-              <div class="form-row">
-                <label>
-                  出典
-                  <input id="sourceInput" type="text" placeholder="和食の基本 p.42" />
-                </label>
-                <label>
-                  人数
-                  <input id="servingsInput" type="number" min="1" max="12" value="2" />
-                </label>
-              </div>
-              <label>
-                タグ
-                <select id="tagsInput">
-                  <option value="">選択してください</option>
-                  <option value="主菜">主菜</option>
-                  <option value="副菜">副菜</option>
-                </select>
-              </label>
-              <label>
-                ラベル
-                <select id="recipeLabelInput">
-                  <option value="">ラベルなし</option>
-                </select>
-              </label>
-              <label>
-                材料
-                <textarea id="ingredientsInput" rows="6" placeholder="鮭 2切れ&#10;玉ねぎ 1/2個&#10;酢 大さじ3"></textarea>
-              </label>
-              <label>
-                行程
-                <textarea id="stepsInput" rows="5" placeholder="1. 鮭に塩をふる&#10;2. 野菜を切る&#10;3. 調味料に漬ける"></textarea>
-              </label>
-              <div class="form-actions">
-                <button class="primary-button" type="submit">
-                  保存
-                </button>
-                <button id="clearFormButton" class="secondary-button" type="button">クリア</button>
-                <button id="deleteRecipeButton" class="danger-button hidden" type="button">
-                  <i data-lucide="trash-2"></i>
-                  削除
-                </button>
-              </div>
-            </form>
           </div>
-
-          <div class="panel import-panel app-view" data-view="recipe">
-            <div class="panel-heading">
-              <div>
-                <h2>電子書籍テキスト</h2>
-                <span class="subtle">材料 / 作り方 見出しに対応</span>
-              </div>
-              <button id="parseButton" class="secondary-button" type="button">テキストから抽出</button>
-            </div>
-            <div class="file-import-row pdf-import-row">
-              <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
-              <button id="pdfImportButton" class="secondary-button" type="button">
-                PDF取込
-              </button>
-            </div>
-            <p class="subtle import-help">「ホットクックレシピ30選」は全メニューを一括登録します。その他のPDFは入力欄へテキストを抽出します。</p>
-            <textarea id="ebookInput" rows="12" placeholder="料理名&#10;材料（2人分）&#10;鶏もも肉 300g&#10;長ねぎ 1本&#10;&#10;作り方&#10;1. 材料を切る&#10;2. フライパンで焼く"></textarea>
-            <div id="parseResult" class="parse-result"></div>
-          </div>
-
-          <div class="panel plan-panel app-view" data-view="plan">
-            <div class="panel-heading plan-heading">
-              <div>
-                <h2>月間献立</h2>
-                <span id="monthLabel" class="subtle"></span>
-              </div>
-              <div class="compact-actions">
-                <button id="prevMonthButton" class="icon-button" type="button" title="前月">
-                  <i data-lucide="chevron-left"></i>
-                </button>
-                <button id="nextMonthButton" class="icon-button" type="button" title="翌月">
-                  <i data-lucide="chevron-right"></i>
-                </button>
-              </div>
-            </div>
-            <div class="plan-tools">
-              <button id="suggestMonthButton" class="primary-button" type="button">
-                今月を提案
-              </button>
-              <select id="recipeSelect" aria-label="献立に入れるレシピ"></select>
-            </div>
-            <div id="calendarGrid" class="calendar-grid"></div>
-          </div>
-
-          <div class="panel list-panel app-view" data-view="shopping">
-            <div class="panel-heading shopping-heading">
-              <div>
-                <h2>買い物リスト</h2>
-                <span id="weekLabel" class="subtle"></span>
-              </div>
-              <div class="compact-actions">
-                <button id="prevWeekButton" class="icon-button" type="button" title="前週">
-                  <i data-lucide="chevron-left"></i>
-                </button>
-                <button id="nextWeekButton" class="icon-button" type="button" title="翌週">
-                  <i data-lucide="chevron-right"></i>
-                </button>
-              </div>
-            </div>
-            <div id="shoppingList" class="shopping-list"></div>
-          </div>
+          <div id="shoppingList" class="shopping-list"></div>
         </section>
+      </div>
+    </main>
 
-        <section class="panel recipe-list-panel app-view" data-view="recipe">
-          <div class="panel-heading">
-            <div>
-              <h2>登録済みレシピ</h2>
-              <span class="subtle">献立候補</span>
-            </div>
-            <div class="recipe-filters">
-              <select id="tagFilter" aria-label="タグで絞り込み">
-                <option value="">すべてのタグ</option>
-                <option value="主菜">主菜</option>
-                <option value="副菜">副菜</option>
-              </select>
-              <select id="labelFilter" aria-label="ラベルで絞り込み">
-                <option value="">すべてのラベル</option>
-              </select>
-            </div>
-          </div>
-          <div id="recipeList" class="recipe-list"></div>
-        </section>
+    <nav class="mobile-nav" aria-label="メインナビゲーション">
+      <button class="mobile-nav-button active" type="button" data-view-link="home"><span>⌂</span>メニュー</button>
+      <button class="mobile-nav-button" type="button" data-view-link="week"><span>▦</span>1週間</button>
+      <button class="mobile-nav-button" type="button" data-view-link="shopping"><span>✓</span>買い物</button>
+    </nav>
 
-        <section class="panel label-settings-panel app-view" data-view="labels">
-          <div class="panel-heading">
-            <div>
-              <h2>ラベル設定</h2>
-              <span id="labelCount" class="subtle">0 / 10件</span>
-            </div>
-            <button id="closeLabelSettingsButton" class="secondary-button" type="button">レシピDBへ戻る</button>
-          </div>
-          <form id="labelForm" class="label-form">
-            <label>
-              新しいラベル
-              <input id="labelNameInput" type="text" maxlength="30" placeholder="例：時短、作り置き、お弁当" required />
-            </label>
-            <button id="addLabelButton" class="primary-button" type="submit">追加</button>
-          </form>
-          <div id="labelMessage" class="menu-status" aria-live="polite"></div>
-          <div id="labelList" class="label-list"></div>
-        </section>
-      </main>
-      <nav id="mobileNav" class="mobile-nav" aria-label="主要メニュー">
-        <button class="mobile-nav-button active" type="button" data-tab="today">
-          今日
-        </button>
-        <button class="mobile-nav-button" type="button" data-tab="shopping">
-          買い物
-        </button>
-        <button class="mobile-nav-button" type="button" data-tab="plan">
-          献立
-        </button>
-        <button class="mobile-nav-button" type="button" data-tab="recipe">
-          レシピ
-        </button>
-      </nav>
-    </div>
+    <dialog id="recipeDialog" class="recipe-dialog">
+      <button id="closeRecipeDialog" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      <img id="dialogRecipeImage" class="dialog-hero" alt="" />
+      <div class="dialog-body">
+        <span id="dialogRecipeGenre" class="genre-pill"></span><h2 id="dialogRecipeTitle"></h2><p id="dialogRecipeMeta" class="dialog-meta"></p>
+        <div class="recipe-detail-grid">
+          <section><h3>材料</h3><div id="dialogIngredients" class="ingredient-list"></div></section>
+          <section><h3>作り方</h3><ol id="dialogSteps" class="step-list"></ol></section>
+        </div>
+        <button id="dialogSelectButton" class="primary-button wide-button" type="button">この料理を選択</button>
+      </div>
+    </dialog>
+
+    <dialog id="scheduleDialog" class="schedule-dialog">
+      <form id="scheduleForm" method="dialog">
+        <div class="schedule-header"><div><span class="eyebrow">ADD TO WEEK</span><h2>曜日と時間を選ぶ</h2></div><button id="closeScheduleDialog" class="dialog-close inline-close" type="button" aria-label="閉じる">×</button></div>
+        <p>選んだ料理ごとに、追加する曜日と朝・昼・夜を指定してください。</p>
+        <div id="scheduleRows" class="schedule-rows"></div>
+        <p id="scheduleMessage" class="form-message" aria-live="polite"></p>
+        <div class="dialog-actions"><button id="cancelScheduleButton" class="secondary-button" type="button">キャンセル</button><button class="primary-button" type="submit">登録する</button></div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

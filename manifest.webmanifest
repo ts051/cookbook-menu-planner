@@ -4,8 +4,8 @@
   "start_url": "/cookbook-menu-planner/",
   "scope": "/cookbook-menu-planner/",
   "display": "standalone",
-  "background_color": "#f4eadb",
-  "theme_color": "#f4eadb",
+  "background_color": "#fffaf2",
+  "theme_color": "#fffaf2",
   "icons": [
     {
       "src": "/cookbook-menu-planner/assets/cookbook-menu-planner-icon-192.png",

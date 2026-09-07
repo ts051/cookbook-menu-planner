@@ -2,6 +2,13 @@ window.HOTCOOK_RECIPE_BOOK = {
   id: "rakulifemiho-ver1-4",
   filenamePattern: /hotcookrecipe_rakulifemiho_ver1_4\.pdf$/i,
   title: "ホットクックレシピ30選",
+  genres: [
+    { id: "best5", title: "人気おかず BEST5!!", description: "まず作りたい、みんなに人気の定番おかず" },
+    { id: "main", title: "一品で満足 主菜10選", description: "これ一品で食卓が整う、頼れる主役メニュー" },
+    { id: "soup-rice", title: "主菜級！汁物・ご飯5選", description: "具だくさんの汁物と、炊飯までおまかせのご飯もの" },
+    { id: "side", title: "パパッと副菜6選", description: "あと一品にうれしい、手軽な副菜" },
+    { id: "light-meal", title: "お昼や簡単夕飯に♪ライトミール4選", description: "忙しい日のランチや軽めの夕食に" }
+  ],
   recipes: [
     {
       title: "ふっくらおいしい！鶏肉の照り焼き風", page: 6, servings: 4, tags: ["主菜"],
@@ -155,3 +162,17 @@ window.HOTCOOK_RECIPE_BOOK = {
     }
   ]
 };
+
+const hotcookRecipeSlugs = [
+  "teriyaki-chicken", "tomato-chicken", "salt-nikujaga", "chicken-mizore", "pork-daikon",
+  "chicken-daikon", "taco-rice", "curry-rice", "cream-stew", "pot-au-feu",
+  "oden", "chikuzenni", "ratatouille", "meat-sauce", "salt-spare-ribs",
+  "tonjiru", "kenchinjiru", "onion-soup", "mushroom-rice", "sweet-potato-rice",
+  "lotus-kinpira", "turnip-bacon", "eggplant-nibitashi", "atsuage-soboro", "carrot-tuna",
+  "steamed-peppers", "butter-soy-pasta", "yaki-udon", "katsudon", "fried-rice"
+];
+
+window.HOTCOOK_RECIPE_BOOK.recipes.forEach((recipe, index) => {
+  recipe.genre = index < 5 ? "best5" : index < 15 ? "main" : index < 20 ? "soup-rice" : index < 26 ? "side" : "light-meal";
+  recipe.thumbnail = `./assets/recipes/${hotcookRecipeSlugs[index]}.webp`;
+});
