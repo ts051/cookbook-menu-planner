@@ -9,10 +9,10 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=20260908" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260908-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260908-2" />
     <script src="./supabase-config.js"></script>
     <script defer src="./hotcook-recipes.js?v=20260908-1"></script>
-    <script defer src="./app.js?v=20260908-1"></script>
+    <script defer src="./app.js?v=20260908-2"></script>
   </head>
   <body>
     <header class="site-header">
@@ -58,7 +58,7 @@
       <div id="appContent">
         <section class="app-view" data-view="home">
           <div class="page-intro">
-            <div><span class="eyebrow">HOTCOOK RECIPE BOOK</span><h1>今週、何をつくる？</h1><p>気になる料理にチェックを入れて、1週間のメニューに追加できます。</p></div>
+            <div><span class="eyebrow">HOTCOOK RECIPE BOOK</span><h1>今週、何をつくる？</h1><p>日付と食種を選んで、1週間のメニューに追加できます。</p></div>
             <button id="scheduleSelectionButton" class="primary-button" type="button" disabled>1週間メニューに追加</button>
           </div>
           <div id="genreContainer" class="genre-container"></div>
@@ -100,18 +100,8 @@
           <section><h3>材料</h3><div id="dialogIngredients" class="ingredient-list"></div></section>
           <section><h3>作り方</h3><ol id="dialogSteps" class="step-list"></ol></section>
         </div>
-        <button id="dialogSelectButton" class="primary-button wide-button" type="button">この料理を選択</button>
+        <button id="dialogSelectButton" class="primary-button wide-button" type="button">このメニューの日付を選ぶ</button>
       </div>
-    </dialog>
-
-    <dialog id="scheduleDialog" class="schedule-dialog">
-      <form id="scheduleForm" method="dialog">
-        <div class="schedule-header"><div><span class="eyebrow">ADD TO WEEK</span><h2>曜日と品数枠を選ぶ</h2></div><button id="closeScheduleDialog" class="dialog-close inline-close" type="button" aria-label="閉じる">×</button></div>
-        <p>選んだ料理ごとに、追加する曜日と1〜3品目を指定してください。</p>
-        <div id="scheduleRows" class="schedule-rows"></div>
-        <p id="scheduleMessage" class="form-message" aria-live="polite"></p>
-        <div class="dialog-actions"><button id="cancelScheduleButton" class="secondary-button" type="button">キャンセル</button><button class="primary-button" type="submit">登録する</button></div>
-      </form>
     </dialog>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

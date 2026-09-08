@@ -19,12 +19,18 @@ const mealSlots = [
   { id: "dish3", label: "3品目" }
 ];
 const legacyMealSlots = ["breakfast", "lunch", "dinner"];
+const mealTypes = [
+  { id: "main", label: "主菜" },
+  { id: "side", label: "副菜" },
+  { id: "staple", label: "主食" },
+  { id: "soup", label: "汁物" }
+];
 
 let supabaseClient = null;
 let currentUser = null;
 let currentDialogRecipeId = "";
 let toastTimer = null;
-const selectedRecipeIds = new Set();
+const recipeSelections = new Map();
 const els = {};
 const state = {
   recipes: [],
@@ -52,8 +58,7 @@ function bindElements() {
     "usernameInput", "passwordInput", "authBadge", "appContent", "scheduleSelectionButton", "genreContainer", "weekRange",
     "prevWeekButton", "currentWeekButton", "nextWeekButton", "weeklyGrid", "shoppingWeekRange", "shoppingProgress",
     "shoppingList", "prevShoppingWeekButton", "currentShoppingWeekButton", "nextShoppingWeekButton", "recipeDialog", "closeRecipeDialog", "dialogRecipeImage", "dialogRecipeGenre", "dialogRecipeTitle",
-    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "scheduleDialog", "scheduleForm",
-    "closeScheduleDialog", "cancelScheduleButton", "scheduleRows", "scheduleMessage", "toast"
+    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "toast"
   ].forEach((id) => { els[id] = document.getElementById(id); });
 }
 
@@ -66,21 +71,16 @@ function bindEvents() {
   els.signOutButton.addEventListener("click", signOut);
   els.syncButton.addEventListener("click", async () => { await loadAll(); render(); closeMenu(); showToast("最新データを読み込みました"); });
   document.querySelectorAll("[data-view-link]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.viewLink)));
-  els.scheduleSelectionButton.addEventListener("click", openScheduleDialog);
+  els.scheduleSelectionButton.addEventListener("click", addSelectionsToWeek);
   els.prevWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextWeekButton.addEventListener("click", () => moveWeek(1));
-  els.currentWeekButton.addEventListener("click", () => { state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
+  els.currentWeekButton.addEventListener("click", () => { recipeSelections.clear(); state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
   els.prevShoppingWeekButton.addEventListener("click", () => moveWeek(-1));
   els.nextShoppingWeekButton.addEventListener("click", () => moveWeek(1));
-  els.currentShoppingWeekButton.addEventListener("click", () => { state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
+  els.currentShoppingWeekButton.addEventListener("click", () => { recipeSelections.clear(); state.weekCursor = startOfWeek(new Date()); renderWeekViews(); });
   els.closeRecipeDialog.addEventListener("click", () => els.recipeDialog.close());
   els.dialogSelectButton.addEventListener("click", toggleDialogRecipeSelection);
-  els.closeScheduleDialog.addEventListener("click", () => els.scheduleDialog.close());
-  els.cancelScheduleButton.addEventListener("click", () => els.scheduleDialog.close());
-  els.scheduleForm.addEventListener("submit", saveSchedule);
-  [els.recipeDialog, els.scheduleDialog].forEach((dialog) => dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close();
-  }));
+  els.recipeDialog.addEventListener("click", (event) => { if (event.target === els.recipeDialog) els.recipeDialog.close(); });
   window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
 }
 
@@ -103,6 +103,7 @@ function switchView(view) {
   if (!["home", "week", "shopping"].includes(view)) return;
   state.activeView = view;
   renderNavigation();
+  if (view === "home") renderHome();
   if (view === "week") renderWeek();
   if (view === "shopping") renderShoppingList();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -137,36 +138,55 @@ function renderHome() {
 }
 
 function createRecipeCard(recipe) {
+  const selection = recipeSelections.get(recipe.id) || { date: "", mealType: "" };
   const card = document.createElement("article");
-  card.className = `recipe-card${selectedRecipeIds.has(recipe.id) ? " selected" : ""}`;
+  card.dataset.recipeId = recipe.id;
+  card.className = `recipe-card${selection.date && selection.mealType ? " selected" : ""}`;
   card.innerHTML = `
-    <button class="recipe-open" type="button" aria-label="${escapeHTML(recipe.title)}の詳細を見る">
+    <button class="recipe-thumb-button" type="button" aria-label="${escapeHTML(recipe.title)}の詳細を見る">
       <img class="recipe-thumb" src="${escapeHTML(recipeImage(recipe))}" alt="${escapeHTML(recipe.title)}" loading="lazy" />
-      <div class="recipe-card-body">
-        <h3>${escapeHTML(recipe.title)}</h3>
-        <div class="recipe-meta"><span>${recipe.servings || 4}人分</span><span>${escapeHTML(recipe.source_title || "")}</span></div>
-      </div>
     </button>
-    <label class="recipe-check-label" aria-label="${escapeHTML(recipe.title)}を選択">
-      <input class="recipe-check" type="checkbox" ${selectedRecipeIds.has(recipe.id) ? "checked" : ""} />
-    </label>
+    <div class="recipe-card-body">
+      <button class="recipe-title-button" type="button"><h3>${escapeHTML(recipe.title)}</h3></button>
+      <div class="recipe-card-controls">
+        <label><span>日付選択</span><select class="recipe-date" aria-label="${escapeHTML(recipe.title)}の日付">${recipeDateOptions(selection.date)}</select></label>
+        <label><span>食種選択</span><select class="recipe-meal-type" aria-label="${escapeHTML(recipe.title)}の食種">${mealTypeOptions(selection.mealType)}</select></label>
+      </div>
+    </div>
   `;
-  card.querySelector(".recipe-open").addEventListener("click", () => openRecipeDialog(recipe));
-  card.querySelector(".recipe-check").addEventListener("change", (event) => setRecipeSelected(recipe.id, event.target.checked));
+  card.querySelector(".recipe-thumb-button").addEventListener("click", () => openRecipeDialog(recipe));
+  card.querySelector(".recipe-title-button").addEventListener("click", () => openRecipeDialog(recipe));
+  card.querySelector(".recipe-date").addEventListener("change", (event) => updateRecipeSelection(recipe.id, "date", event.target.value, card));
+  card.querySelector(".recipe-meal-type").addEventListener("change", (event) => updateRecipeSelection(recipe.id, "mealType", event.target.value, card));
   return card;
 }
 
+function recipeDateOptions(selectedDate = "") {
+  const empty = `<option value="">-</option>`;
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(state.weekCursor, index);
+    const iso = toISODate(date);
+    return `<option value="${iso}"${iso === selectedDate ? " selected" : ""}>${date.getMonth() + 1}/${date.getDate()}（${weekdays[index]}）</option>`;
+  }).join("");
+  return empty + dates;
+}
+
+function mealTypeOptions(selectedType = "") {
+  return `<option value="">-</option>` + mealTypes.map((type) => `<option value="${type.id}"${type.id === selectedType ? " selected" : ""}>${type.label}</option>`).join("");
+}
+
 function renderSelectionButton() {
-  const count = selectedRecipeIds.size;
+  const count = [...recipeSelections.values()].filter((selection) => selection.date && selection.mealType).length;
   els.scheduleSelectionButton.disabled = count === 0;
   els.scheduleSelectionButton.textContent = count ? `1週間メニューに追加（${count}）` : "1週間メニューに追加";
 }
 
-function setRecipeSelected(id, selected) {
-  if (selected) selectedRecipeIds.add(id);
-  else selectedRecipeIds.delete(id);
-  renderHome();
-  if (currentDialogRecipeId === id && els.recipeDialog.open) updateDialogSelectButton();
+function updateRecipeSelection(id, field, value, card) {
+  const selection = { ...(recipeSelections.get(id) || { date: "", mealType: "" }), [field]: value };
+  if (!selection.date && !selection.mealType) recipeSelections.delete(id);
+  else recipeSelections.set(id, selection);
+  card.classList.toggle("selected", Boolean(selection.date && selection.mealType));
+  renderSelectionButton();
 }
 
 function openRecipeDialog(recipe) {
@@ -183,59 +203,40 @@ function openRecipeDialog(recipe) {
 }
 
 function updateDialogSelectButton() {
-  const selected = selectedRecipeIds.has(currentDialogRecipeId);
-  els.dialogSelectButton.textContent = selected ? "選択を解除" : "この料理を選択";
-  els.dialogSelectButton.classList.toggle("secondary-button", selected);
+  const recipe = state.recipes.find((item) => item.id === currentDialogRecipeId);
+  els.dialogSelectButton.textContent = "このメニューの日付を選ぶ";
+  els.dialogSelectButton.disabled = !recipe;
 }
 
 function toggleDialogRecipeSelection() {
-  const selected = !selectedRecipeIds.has(currentDialogRecipeId);
-  setRecipeSelected(currentDialogRecipeId, selected);
+  const recipeId = currentDialogRecipeId;
   els.recipeDialog.close();
-  if (selected) showToast("料理を選択しました");
+  document.querySelector(`.recipe-card[data-recipe-id="${CSS.escape(recipeId)}"] .recipe-date`)?.focus();
 }
 
-function openScheduleDialog() {
-  const recipes = state.recipes.filter((recipe) => selectedRecipeIds.has(recipe.id));
-  if (!recipes.length) return;
-  els.scheduleRows.innerHTML = "";
-  els.scheduleMessage.textContent = "";
-  recipes.forEach((recipe, index) => {
-    const row = document.createElement("div");
-    row.className = "schedule-row";
-    row.dataset.recipeId = recipe.id;
-    row.innerHTML = `
-      <div class="schedule-recipe"><img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong></div>
-      <select class="schedule-day" aria-label="${escapeHTML(recipe.title)}の曜日">${weekDayOptions(index)}</select>
-      <select class="schedule-slot" aria-label="${escapeHTML(recipe.title)}の品数枠">${mealSlots.map((slot) => `<option value="${slot.id}">${slot.label}</option>`).join("")}</select>
-    `;
-    row.querySelector(".schedule-slot").value = mealSlots[index % mealSlots.length].id;
-    els.scheduleRows.append(row);
+async function addSelectionsToWeek() {
+  const selected = [...recipeSelections.entries()].filter(([, selection]) => selection.date && selection.mealType);
+  if (!selected.length) return;
+  const entries = [];
+  const selectedByDate = new Map();
+  selected.forEach(([recipeId, selection]) => {
+    if (!selectedByDate.has(selection.date)) selectedByDate.set(selection.date, []);
+    selectedByDate.get(selection.date).push({ recipeId, mealType: selection.mealType });
   });
-  els.scheduleDialog.showModal();
-}
 
-function weekDayOptions(offset) {
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(state.weekCursor, index);
-    const selected = index === offset % 7 ? " selected" : "";
-    return `<option value="${toISODate(date)}"${selected}>${weekdays[index]} ${date.getMonth() + 1}/${date.getDate()}</option>`;
-  }).join("");
-}
-
-async function saveSchedule(event) {
-  event.preventDefault();
-  const rows = Array.from(els.scheduleRows.querySelectorAll(".schedule-row"));
-  const entries = rows.map((row) => ({
-    id: crypto.randomUUID(),
-    plan_date: row.querySelector(".schedule-day").value,
-    meal_slot: row.querySelector(".schedule-slot").value,
-    recipe_id: row.dataset.recipeId
-  }));
-  const keys = entries.map((entry) => `${entry.plan_date}:${entry.meal_slot}`);
-  if (new Set(keys).size !== keys.length) {
-    els.scheduleMessage.textContent = "同じ曜日・品数枠には1品だけ登録できます。選択を変更してください。";
-    return;
+  for (const [date, selections] of selectedByDate) {
+    const occupied = getDayDisplayEntries(date).map((entry, index) => entry ? mealSlots[index].id : null).filter(Boolean);
+    const available = mealSlots.filter((slot) => !occupied.includes(slot.id));
+    if (selections.length > available.length) {
+      showToast(`${formatShortDate(date)}は3品までです`);
+      return;
+    }
+    selections.forEach((selection, index) => entries.push({
+      id: crypto.randomUUID(),
+      plan_date: date,
+      meal_slot: `${available[index].id}:${selection.mealType}`,
+      recipe_id: selection.recipeId
+    }));
   }
 
   if (canUseRemote()) {
@@ -243,19 +244,16 @@ async function saveSchedule(event) {
     const { error } = await supabaseClient.from("meal_plan_entries").upsert(payload, { onConflict: "user_id,plan_date,meal_slot" });
     if (error) {
       console.error(error);
-      els.scheduleMessage.textContent = "登録できませんでした。もう一度お試しください。";
+      showToast("登録できませんでした");
       return;
     }
     await loadRemote();
   } else {
-    const entryKeys = new Set(keys);
-    state.plan = state.plan.filter((entry) => !entryKeys.has(`${entry.plan_date}:${entry.meal_slot}`));
     state.plan.push(...entries);
     saveLocal();
   }
 
-  selectedRecipeIds.clear();
-  els.scheduleDialog.close();
+  recipeSelections.clear();
   render();
   switchView("week");
   showToast(`${entries.length}件を1週間メニューに登録しました`);
@@ -271,12 +269,21 @@ function getDayDisplayEntries(iso) {
   const legacyEntries = legacyMealSlots.map((slot) => dayEntries.find((entry) => entry.meal_slot === slot)).filter(Boolean);
   let legacyIndex = 0;
   return mealSlots.map((slot) => {
-    const current = dayEntries.find((entry) => entry.meal_slot === slot.id);
+    const current = dayEntries.find((entry) => entrySlotId(entry) === slot.id);
     if (current) return current;
     const legacy = legacyEntries[legacyIndex] || null;
     legacyIndex += legacy ? 1 : 0;
     return legacy;
   });
+}
+
+function entrySlotId(entry) {
+  return String(entry?.meal_slot || "").split(":")[0];
+}
+
+function entryMealType(entry) {
+  const typeId = String(entry?.meal_slot || "").split(":")[1] || "";
+  return mealTypes.find((type) => type.id === typeId)?.label || "";
 }
 
 function getWeekDisplayEntries() {
@@ -305,7 +312,8 @@ function renderWeek() {
       if (recipe) {
         const card = document.createElement("div");
         card.className = "meal-card";
-        card.innerHTML = `<img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong><button class="remove-meal" type="button">削除</button>`;
+        const mealType = entryMealType(entry);
+        card.innerHTML = `<img src="${escapeHTML(recipeImage(recipe))}" alt="" />${mealType ? `<span class="meal-type-badge">${mealType}</span>` : ""}<strong>${escapeHTML(recipe.title)}</strong><button class="remove-meal" type="button">削除</button>`;
         card.querySelector("img").addEventListener("click", () => openRecipeDialog(recipe));
         card.querySelector("strong").addEventListener("click", () => openRecipeDialog(recipe));
         card.querySelector(".remove-meal").addEventListener("click", () => removePlanEntry(entry));
@@ -336,6 +344,7 @@ async function removePlanEntry(entry) {
 }
 
 function moveWeek(delta) {
+  recipeSelections.clear();
   state.weekCursor = addDays(state.weekCursor, delta * 7);
   renderWeekViews();
 }
@@ -769,8 +778,8 @@ function roundQuantity(value) { return Math.round(value * 100) / 100; }
 function startOfWeek(date) { const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate()); copy.setDate(copy.getDate() - copy.getDay()); return copy; }
 function addDays(date, days) { const copy = new Date(date); copy.setDate(copy.getDate() + days); return copy; }
 function toISODate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function isDateInWeek(iso, start) { return iso >= toISODate(start) && iso <= toISODate(addDays(start, 6)); }
 function formatWeekRange(start, end) { return `${start.getFullYear()}年${start.getMonth() + 1}月${start.getDate()}日（日）〜 ${end.getMonth() + 1}月${end.getDate()}日（土）`; }
+function formatShortDate(iso) { const [, month, day] = String(iso).split("-"); return `${Number(month)}/${Number(day)}`; }
 
 function showToast(message) {
   els.toast.textContent = message;
