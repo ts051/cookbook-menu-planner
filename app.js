@@ -9,6 +9,7 @@ const isConfigured = Boolean(
 const STORAGE_KEY = "cookbook-menu-planner:v2";
 const LEGACY_STORAGE_KEY = "cookbook-menu-planner:v1";
 const DEFAULT_RECIPE_SEED_KEY = "cookbook-menu-planner-default-recipes:rakulifemiho-ver1-4";
+const MEAL_TYPE_TAG_PREFIX = "__meal_type:";
 const INTERNAL_EMAIL_DOMAIN = "cookbook.local";
 const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
@@ -133,7 +134,7 @@ function renderHome() {
 }
 
 function createRecipeCard(recipe) {
-  const selection = recipeSelections.get(recipe.id) || { date: "", mealType: "" };
+  const selection = recipeSelections.get(recipe.id) || { date: "", mealType: savedRecipeMealType(recipe) };
   const card = document.createElement("article");
   card.dataset.recipeId = recipe.id;
   card.className = `recipe-card${selection.date && selection.mealType ? " selected" : ""}`;
@@ -170,6 +171,12 @@ function mealTypeOptions(selectedType = "") {
   return `<option value="">-</option>` + mealTypes.map((type) => `<option value="${type.id}"${type.id === selectedType ? " selected" : ""}>${type.label}</option>`).join("");
 }
 
+function savedRecipeMealType(recipe) {
+  const tag = (Array.isArray(recipe?.tags) ? recipe.tags : []).find((item) => String(item).startsWith(MEAL_TYPE_TAG_PREFIX));
+  const typeId = String(tag || "").slice(MEAL_TYPE_TAG_PREFIX.length);
+  return mealTypes.some((type) => type.id === typeId) ? typeId : "";
+}
+
 function renderSelectionButton() {
   const count = [...recipeSelections.values()].filter((selection) => selection.date && selection.mealType).length;
   els.scheduleSelectionButton.disabled = count === 0;
@@ -177,11 +184,35 @@ function renderSelectionButton() {
 }
 
 function updateRecipeSelection(id, field, value, card) {
-  const selection = { ...(recipeSelections.get(id) || { date: "", mealType: "" }), [field]: value };
+  const recipe = state.recipes.find((item) => item.id === id);
+  const selection = { ...(recipeSelections.get(id) || { date: "", mealType: savedRecipeMealType(recipe) }), [field]: value };
   if (!selection.date && !selection.mealType) recipeSelections.delete(id);
   else recipeSelections.set(id, selection);
   card.classList.toggle("selected", Boolean(selection.date && selection.mealType));
   renderSelectionButton();
+  if (field === "mealType" && recipe) void saveRecipeMealType(recipe, value);
+}
+
+async function saveRecipeMealType(recipe, mealType) {
+  const previousTags = Array.isArray(recipe.tags) ? [...recipe.tags] : [];
+  const nextTags = previousTags.filter((tag) => !String(tag).startsWith(MEAL_TYPE_TAG_PREFIX));
+  if (mealTypes.some((type) => type.id === mealType)) nextTags.push(`${MEAL_TYPE_TAG_PREFIX}${mealType}`);
+  recipe.tags = nextTags;
+  if (canUseRemote()) {
+    const { error } = await supabaseClient.from("recipes").update({ tags: nextTags }).eq("id", recipe.id);
+    if (error) {
+      console.error(error);
+      recipe.tags = previousTags;
+      const previousType = savedRecipeMealType(recipe);
+      const selection = { ...(recipeSelections.get(recipe.id) || { date: "", mealType: previousType }), mealType: previousType };
+      if (!selection.date && !selection.mealType) recipeSelections.delete(recipe.id);
+      else recipeSelections.set(recipe.id, selection);
+      renderHome();
+      showToast("食種を保存できませんでした");
+    }
+  } else {
+    saveLocal();
+  }
 }
 
 function openRecipeDialog(recipe) {
