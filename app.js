@@ -14,17 +14,12 @@ const LEGACY_EMAIL_DOMAIN = "cookbook.example.com";
 const USERNAME_PATTERN = /^[a-z0-9._-]{1,40}$/;
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const mealSlots = [
-  { id: "dish1", label: "1品目" },
-  { id: "dish2", label: "2品目" },
-  { id: "dish3", label: "3品目" }
-];
-const legacyMealSlots = ["breakfast", "lunch", "dinner"];
-const mealTypes = [
   { id: "main", label: "主菜" },
   { id: "side", label: "副菜" },
   { id: "staple", label: "主食" },
   { id: "soup", label: "汁物" }
 ];
+const mealTypes = mealSlots;
 
 let supabaseClient = null;
 let currentUser = null;
@@ -225,18 +220,22 @@ async function addSelectionsToWeek() {
   });
 
   for (const [date, selections] of selectedByDate) {
-    const occupied = getDayDisplayEntries(date).map((entry, index) => entry ? mealSlots[index].id : null).filter(Boolean);
-    const available = mealSlots.filter((slot) => !occupied.includes(slot.id));
-    if (selections.length > available.length) {
-      showToast(`${formatShortDate(date)}は3品までです`);
+    const selectedTypes = selections.map((selection) => selection.mealType);
+    if (new Set(selectedTypes).size !== selectedTypes.length) {
+      showToast(`${formatShortDate(date)}の同じ食種は1品までです`);
       return;
     }
-    selections.forEach((selection, index) => entries.push({
-      id: crypto.randomUUID(),
-      plan_date: date,
-      meal_slot: `${available[index].id}:${selection.mealType}`,
-      recipe_id: selection.recipeId
-    }));
+    const currentEntries = getDayDisplayEntries(date);
+    selections.forEach((selection) => {
+      const slotIndex = mealSlots.findIndex((slot) => slot.id === selection.mealType);
+      const existing = currentEntries[slotIndex] || null;
+      entries.push({
+        id: existing?.id || crypto.randomUUID(),
+        plan_date: date,
+        meal_slot: existing?.meal_slot || selection.mealType,
+        recipe_id: selection.recipeId
+      });
+    });
   }
 
   if (canUseRemote()) {
@@ -249,6 +248,8 @@ async function addSelectionsToWeek() {
     }
     await loadRemote();
   } else {
+    const replacedIds = new Set(entries.map((entry) => entry.id));
+    state.plan = state.plan.filter((entry) => !replacedIds.has(entry.id));
     state.plan.push(...entries);
     saveLocal();
   }
@@ -266,24 +267,21 @@ function renderWeekViews() {
 
 function getDayDisplayEntries(iso) {
   const dayEntries = state.plan.filter((entry) => entry.plan_date === iso);
-  const legacyEntries = legacyMealSlots.map((slot) => dayEntries.find((entry) => entry.meal_slot === slot)).filter(Boolean);
-  let legacyIndex = 0;
+  const untypedEntries = dayEntries.filter((entry) => !entryMealTypeId(entry));
+  let untypedIndex = 0;
   return mealSlots.map((slot) => {
-    const current = dayEntries.find((entry) => entrySlotId(entry) === slot.id);
+    const current = dayEntries.find((entry) => entryMealTypeId(entry) === slot.id);
     if (current) return current;
-    const legacy = legacyEntries[legacyIndex] || null;
-    legacyIndex += legacy ? 1 : 0;
-    return legacy;
+    const untyped = untypedEntries[untypedIndex] || null;
+    untypedIndex += untyped ? 1 : 0;
+    return untyped;
   });
 }
 
-function entrySlotId(entry) {
-  return String(entry?.meal_slot || "").split(":")[0];
-}
-
-function entryMealType(entry) {
-  const typeId = String(entry?.meal_slot || "").split(":")[1] || "";
-  return mealTypes.find((type) => type.id === typeId)?.label || "";
+function entryMealTypeId(entry) {
+  const parts = String(entry?.meal_slot || "").split(":");
+  const candidate = parts[1] || parts[0];
+  return mealTypes.some((type) => type.id === candidate) ? candidate : "";
 }
 
 function getWeekDisplayEntries() {
@@ -312,8 +310,7 @@ function renderWeek() {
       if (recipe) {
         const card = document.createElement("div");
         card.className = "meal-card";
-        const mealType = entryMealType(entry);
-        card.innerHTML = `<img src="${escapeHTML(recipeImage(recipe))}" alt="" />${mealType ? `<span class="meal-type-badge">${mealType}</span>` : ""}<strong>${escapeHTML(recipe.title)}</strong><button class="remove-meal" type="button">削除</button>`;
+        card.innerHTML = `<img src="${escapeHTML(recipeImage(recipe))}" alt="" /><strong>${escapeHTML(recipe.title)}</strong><button class="remove-meal" type="button">削除</button>`;
         card.querySelector("img").addEventListener("click", () => openRecipeDialog(recipe));
         card.querySelector("strong").addEventListener("click", () => openRecipeDialog(recipe));
         card.querySelector(".remove-meal").addEventListener("click", () => removePlanEntry(entry));

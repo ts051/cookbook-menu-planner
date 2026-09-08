@@ -184,12 +184,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .day-heading span { color: var(--muted); font-size: 0.78rem; }
 .day-column.today { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(224, 91, 42, 0.12); }
 .day-column.today .day-heading { background: #fff0e7; color: var(--orange-dark); }
-.meal-slots { padding: 9px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.meal-slots { padding: 9px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .meal-slot { min-height: 104px; border: 1px dashed #dfd2c1; border-radius: 12px; padding: 8px; display: grid; align-content: start; gap: 7px; }
 .meal-slot-label { color: var(--muted); font-size: 0.72rem; font-weight: 900; }
 .meal-card { display: grid; gap: 6px; }
 .meal-card img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: 8px; }
-.meal-type-badge { justify-self: start; border-radius: 999px; background: #fff0e7; color: var(--orange-dark); padding: 2px 7px; font-size: 0.72rem; font-weight: 900; }
 .meal-card strong { font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
 .remove-meal { justify-self: end; border: 0; background: transparent; color: var(--orange-dark); padding: 1px 0; font-size: 0.72rem; font-weight: 800; }
 .empty-slot { color: #b8aa98; font-size: 0.74rem; text-align: center; padding-top: 18px; }
