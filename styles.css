@@ -184,14 +184,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .day-heading span { color: var(--muted); font-size: 0.78rem; }
 .day-column.today { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(224, 91, 42, 0.12); }
 .day-column.today .day-heading { background: #fff0e7; color: var(--orange-dark); }
-.meal-slots { padding: 9px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.meal-slot { min-height: 104px; border: 1px dashed #dfd2c1; border-radius: 12px; padding: 8px; display: grid; align-content: start; gap: 7px; }
-.meal-slot-label { color: var(--muted); font-size: 0.72rem; font-weight: 900; }
-.meal-card { display: grid; gap: 6px; }
-.meal-card img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: 8px; }
-.meal-card strong { font-size: 0.78rem; line-height: 1.35; word-break: break-word; }
+.meal-slots { padding: 9px; display: grid; grid-template-columns: 1fr; gap: 7px; }
+.meal-slot { min-height: 76px; border: 1px dashed #dfd2c1; border-radius: 12px; padding: 7px; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 9px; }
+.meal-slot-label { color: var(--orange-dark); font-size: 0.8rem; font-weight: 900; text-align: center; }
+.meal-card { min-width: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.meal-card img { width: 72px; aspect-ratio: 8 / 5; object-fit: cover; border-radius: 8px; }
+.meal-card strong { min-width: 0; font-size: 0.9rem; line-height: 1.4; word-break: break-word; }
 .remove-meal { justify-self: end; border: 0; background: transparent; color: var(--orange-dark); padding: 1px 0; font-size: 0.72rem; font-weight: 800; }
-.empty-slot { color: #b8aa98; font-size: 0.74rem; text-align: center; padding-top: 18px; }
+.empty-slot { color: #b8aa98; font-size: 0.82rem; }
 
 .shopping-heading { align-items: center; }
 .shopping-heading-actions { display: flex; align-items: center; gap: 12px; }
@@ -280,8 +280,10 @@ dialog::backdrop { background: rgba(38, 31, 24, 0.58); backdrop-filter: blur(4px
   .recipe-card-body { padding: 11px; }
   .recipe-card h3 { font-size: 0.88rem; }
   .day-column { grid-template-columns: 43px minmax(0, 1fr); }
-  .meal-slot { min-height: 100px; }
-  .meal-card img { display: none; }
+  .meal-slot { min-height: 68px; grid-template-columns: 46px minmax(0, 1fr); gap: 6px; padding: 6px; }
+  .meal-card { grid-template-columns: 50px minmax(0, 1fr) auto; gap: 7px; }
+  .meal-card img { display: block; width: 50px; }
+  .meal-card strong { font-size: 0.82rem; }
   .shopping-list { grid-template-columns: 1fr; }
   .shopping-heading { align-items: center; }
   .shopping-heading-actions { display: flex; flex-wrap: nowrap; gap: 6px; }
