@@ -175,8 +175,8 @@ function createRecipeCard(recipe) {
     <div class="recipe-card-body">
       <button class="recipe-title-button" type="button"><h3>${escapeHTML(recipe.title)}</h3></button>
       <div class="recipe-card-controls">
+        <select class="recipe-meal-type" aria-label="${escapeHTML(recipe.title)}の食種">${mealTypeOptions(selection.mealType)}</select>
         <button class="recipe-date-button secondary-button" type="button">日付選択</button>
-        <label><span>食種選択</span><select class="recipe-meal-type" aria-label="${escapeHTML(recipe.title)}の食種">${mealTypeOptions(selection.mealType)}</select></label>
       </div>
     </div>
   `;

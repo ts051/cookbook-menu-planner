@@ -169,13 +169,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .recipe-card.selected { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(224, 91, 42, 0.16), var(--shadow); }
 .recipe-thumb-button { min-width: 0; border: 0; border-right: 1px solid var(--line); background: var(--cream); padding: 0; }
 .recipe-thumb { width: 100%; height: 100%; min-height: 126px; object-fit: cover; display: block; background: var(--cream); }
-.recipe-card-body { min-width: 0; padding: 12px 14px; display: grid; align-content: center; gap: 10px; }
+.recipe-card-body { min-width: 0; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; gap: 12px; }
 .recipe-title-button { border: 0; background: transparent; padding: 0; color: inherit; text-align: left; }
 .recipe-card h3 { margin: 0; font-size: 1rem; line-height: 1.45; }
-.recipe-card-controls { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr); gap: 8px; }
-.recipe-card-controls label { min-width: 0; gap: 3px; color: var(--muted); font-size: 0.82rem; }
-.recipe-card-controls select { min-width: 0; min-height: 38px; padding: 5px 7px; font-size: 0.88rem; }
-.recipe-date-button { min-height: 38px; align-self: end; padding: 0 10px; font-size: 0.88rem; }
+.recipe-card-controls { min-width: 0; display: grid; grid-template-columns: 1fr; gap: 7px; }
+.recipe-card-controls select, .recipe-date-button { width: 100%; min-width: 0; min-height: 38px; height: 38px; padding: 5px 9px; font-size: 0.88rem; }
 .recipe-card.saving { opacity: 0.68; pointer-events: none; }
 
 .week-controls { display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: 8px; align-items: center; }
@@ -293,7 +291,7 @@ dialog::backdrop { background: rgba(38, 31, 24, 0.58); backdrop-filter: blur(4px
   .recipe-card { border-radius: 14px; }
   .recipe-card { grid-template-columns: 76px minmax(0, 1fr); }
   .recipe-thumb { min-height: 116px; }
-  .recipe-card-body { padding: 11px; }
+  .recipe-card-body { grid-template-columns: minmax(0, 1fr) 108px; gap: 8px; padding: 8px 9px; }
   .recipe-card h3 { font-size: 0.88rem; }
   .day-column { grid-template-columns: 43px minmax(0, 1fr); }
   .meal-slot { min-height: 68px; grid-template-columns: 46px minmax(0, 1fr); gap: 6px; padding: 6px; }
