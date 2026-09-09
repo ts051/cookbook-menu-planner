@@ -9,10 +9,10 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=20260908" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260909-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260909-4" />
     <script src="./supabase-config.js"></script>
     <script defer src="./hotcook-recipes.js?v=20260908-1"></script>
-    <script defer src="./app.js?v=20260909-3"></script>
+    <script defer src="./app.js?v=20260909-4"></script>
   </head>
   <body>
     <header class="site-header">
@@ -99,8 +99,16 @@
           <section><h3>材料</h3><div id="dialogIngredients" class="ingredient-list"></div></section>
           <section><h3>作り方</h3><ol id="dialogSteps" class="step-list"></ol></section>
         </div>
-        <button id="dialogSelectButton" class="primary-button wide-button" type="button">このメニューの日付を選ぶ</button>
+        <button id="dialogSelectButton" class="primary-button wide-button" type="button">登録</button>
       </div>
+    </dialog>
+
+    <dialog id="slotRecipeDialog" class="slot-recipe-dialog">
+      <div class="slot-recipe-header">
+        <div><span class="eyebrow">メニューを選択</span><h2 id="slotRecipeTitle"></h2></div>
+        <button id="slotRecipeClose" class="dialog-close inline-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div id="slotRecipeList" class="slot-recipe-list"></div>
     </dialog>
 
     <dialog id="datePickerDialog" class="date-picker-dialog">

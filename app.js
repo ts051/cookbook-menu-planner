@@ -46,6 +46,7 @@ const vegetableUnitRules = [
 let supabaseClient = null;
 let currentUser = null;
 let currentDialogRecipeId = "";
+let recipeDialogPlanContext = null;
 let datePickerRecipeId = "";
 let datePickerCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let datePickerSelectedDate = "";
@@ -78,7 +79,8 @@ function bindElements() {
     "usernameInput", "passwordInput", "authBadge", "appContent", "genreContainer", "weekRange",
     "prevWeekButton", "currentWeekButton", "nextWeekButton", "weeklyGrid", "shoppingWeekRange", "shoppingProgress",
     "shoppingList", "prevShoppingWeekButton", "currentShoppingWeekButton", "nextShoppingWeekButton", "recipeDialog", "closeRecipeDialog", "dialogRecipeImage", "dialogRecipeGenre", "dialogRecipeTitle",
-    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "datePickerDialog", "datePickerPrev",
+    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "slotRecipeDialog", "slotRecipeTitle",
+    "slotRecipeList", "slotRecipeClose", "datePickerDialog", "datePickerPrev",
     "datePickerNext", "datePickerMonth", "datePickerGrid", "datePickerMessage", "datePickerReset", "datePickerCancel",
     "datePickerConfirm", "toast"
   ].forEach((id) => { els[id] = document.getElementById(id); });
@@ -102,6 +104,8 @@ function bindEvents() {
   els.closeRecipeDialog.addEventListener("click", () => els.recipeDialog.close());
   els.dialogSelectButton.addEventListener("click", toggleDialogRecipeSelection);
   els.recipeDialog.addEventListener("click", (event) => { if (event.target === els.recipeDialog) els.recipeDialog.close(); });
+  els.slotRecipeClose.addEventListener("click", () => els.slotRecipeDialog.close());
+  els.slotRecipeDialog.addEventListener("click", (event) => { if (event.target === els.slotRecipeDialog) els.slotRecipeDialog.close(); });
   els.datePickerPrev.addEventListener("click", () => moveDatePickerMonth(-1));
   els.datePickerNext.addEventListener("click", () => moveDatePickerMonth(1));
   els.datePickerReset.addEventListener("click", resetDatePicker);
@@ -176,7 +180,7 @@ function createRecipeCard(recipe) {
       <button class="recipe-title-button" type="button"><h3>${escapeHTML(recipe.title)}</h3></button>
       <div class="recipe-card-controls">
         <select class="recipe-meal-type" aria-label="${escapeHTML(recipe.title)}の食種">${mealTypeOptions(selection.mealType)}</select>
-        <button class="recipe-date-button secondary-button" type="button">日付選択</button>
+        <button class="recipe-date-button secondary-button" type="button">登録</button>
       </div>
     </div>
   `;
@@ -195,6 +199,13 @@ function savedRecipeMealType(recipe) {
   const tag = (Array.isArray(recipe?.tags) ? recipe.tags : []).find((item) => String(item).startsWith(MEAL_TYPE_TAG_PREFIX));
   const typeId = String(tag || "").slice(MEAL_TYPE_TAG_PREFIX.length);
   return mealTypes.some((type) => type.id === typeId) ? typeId : "";
+}
+
+function effectiveRecipeMealType(recipe) {
+  const saved = savedRecipeMealType(recipe);
+  if (saved) return saved;
+  const tags = Array.isArray(recipe?.tags) ? recipe.tags : [];
+  return mealTypes.find((type) => tags.includes(type.label))?.id || "";
 }
 
 async function updateRecipeSelection(id, field, value, card) {
@@ -233,14 +244,18 @@ async function saveRecipeMealType(recipe, mealType) {
   return true;
 }
 
-function openRecipeDialog(recipe) {
+function openRecipeDialog(recipe, planContext = null) {
   currentDialogRecipeId = recipe.id;
+  recipeDialogPlanContext = planContext;
   els.dialogRecipeImage.src = recipeImage(recipe);
   els.dialogRecipeImage.alt = recipe.title;
   els.dialogRecipeGenre.textContent = recipeGenreTitle(recipe);
   els.dialogRecipeTitle.textContent = recipe.title;
   els.dialogRecipeMeta.textContent = [recipe.source_title, `${recipe.servings || 4}人分`].filter(Boolean).join(" ・ ");
-  els.dialogIngredients.innerHTML = (recipe.ingredients || []).map((item) => `<div class="ingredient-row"><span>${escapeHTML(item.name)}</span><span>${escapeHTML(formatIngredientAmount(item))}</span></div>`).join("");
+  els.dialogIngredients.innerHTML = (recipe.ingredients || []).map((item) => {
+    const ingredient = normalizeShoppingIngredient(item);
+    return `<div class="ingredient-row"><span>${escapeHTML(ingredient.name)}</span><span>${escapeHTML(formatIngredientAmount(ingredient))}</span></div>`;
+  }).join("");
   els.dialogSteps.innerHTML = (recipe.steps || []).map((step) => `<li>${escapeHTML(step)}</li>`).join("");
   updateDialogSelectButton();
   els.recipeDialog.showModal();
@@ -248,14 +263,52 @@ function openRecipeDialog(recipe) {
 
 function updateDialogSelectButton() {
   const recipe = state.recipes.find((item) => item.id === currentDialogRecipeId);
-  els.dialogSelectButton.textContent = "このメニューの日付を選ぶ";
+  els.dialogSelectButton.textContent = "登録";
   els.dialogSelectButton.disabled = !recipe;
 }
 
-function toggleDialogRecipeSelection() {
+async function toggleDialogRecipeSelection() {
   const recipeId = currentDialogRecipeId;
+  const context = recipeDialogPlanContext;
   els.recipeDialog.close();
+  if (context) {
+    const recipe = state.recipes.find((item) => item.id === recipeId);
+    const registered = recipe ? await addRecipeToWeek(recipe, context) : false;
+    if (registered && els.slotRecipeDialog.open) els.slotRecipeDialog.close();
+    recipeDialogPlanContext = null;
+    return;
+  }
   openDatePicker(recipeId);
+}
+
+function openSlotRecipeDialog(date, mealType) {
+  const slot = mealTypes.find((type) => type.id === mealType);
+  const selectedDate = new Date(`${date}T00:00:00`);
+  els.slotRecipeTitle.textContent = `${selectedDate.getMonth() + 1}/${selectedDate.getDate()}（${weekdays[selectedDate.getDay()]}）の${slot?.label || "メニュー"}`;
+  els.slotRecipeList.innerHTML = "";
+  const recipes = state.recipes.filter((recipe) => effectiveRecipeMealType(recipe) === mealType);
+  if (!recipes.length) {
+    els.slotRecipeList.innerHTML = `<div class="empty-state">この食種のメニューはまだありません。メインページで食種を選択してください。</div>`;
+  } else {
+    recipes.forEach((recipe) => {
+      const card = document.createElement("article");
+      card.className = "slot-recipe-card";
+      card.innerHTML = `
+        <button class="slot-recipe-thumb" type="button" aria-label="${escapeHTML(recipe.title)}の作り方を見る"><img src="${escapeHTML(recipeImage(recipe))}" alt="${escapeHTML(recipe.title)}" loading="lazy" /></button>
+        <button class="slot-recipe-title" type="button"><strong>${escapeHTML(recipe.title)}</strong></button>
+        <button class="primary-button slot-register-button" type="button">登録</button>
+      `;
+      const context = { date, mealType };
+      card.querySelector(".slot-recipe-thumb").addEventListener("click", () => openRecipeDialog(recipe, context));
+      card.querySelector(".slot-recipe-title").addEventListener("click", () => openRecipeDialog(recipe, context));
+      card.querySelector(".slot-register-button").addEventListener("click", async () => {
+        const registered = await addRecipeToWeek(recipe, context, card);
+        if (registered) els.slotRecipeDialog.close();
+      });
+      els.slotRecipeList.append(card);
+    });
+  }
+  els.slotRecipeDialog.showModal();
 }
 
 function openDatePicker(recipeId) {
@@ -338,15 +391,15 @@ async function addRecipeToWeek(recipe, selection, card) {
     meal_slot: existing?.meal_slot || selection.mealType,
     recipe_id: recipe.id
   };
-  card.classList.add("saving");
+  card?.classList.add("saving");
 
   if (canUseRemote()) {
     const { error } = await supabaseClient.from("meal_plan_entries").upsert({ ...entry, user_id: currentUser.id }, { onConflict: "user_id,plan_date,meal_slot" });
     if (error) {
       console.error(error);
       showToast("登録できませんでした");
-      card.classList.remove("saving");
-      return;
+      card?.classList.remove("saving");
+      return false;
     }
     await loadRemote();
   } else {
@@ -356,10 +409,11 @@ async function addRecipeToWeek(recipe, selection, card) {
   }
 
   recipeSelections.delete(recipe.id);
-  card.classList.remove("selected", "saving");
+  card?.classList.remove("selected", "saving");
   state.weekCursor = startOfWeek(new Date(`${selection.date}T00:00:00`));
   renderWeekViews();
   showToast(`${formatShortDate(selection.date)}の${mealTypes[slotIndex].label}に登録しました`);
+  return true;
 }
 
 function renderWeekViews() {
@@ -418,9 +472,11 @@ function renderWeek() {
         card.querySelector(".remove-meal").addEventListener("click", () => removePlanEntry(entry));
         container.append(card);
       } else {
-        const empty = document.createElement("span");
+        const empty = document.createElement("button");
         empty.className = "empty-slot";
+        empty.type = "button";
         empty.textContent = "未登録";
+        empty.addEventListener("click", () => openSlotRecipeDialog(iso, slot.id));
         container.append(empty);
       }
       slots.append(container);
@@ -477,14 +533,14 @@ function getShoppingItems() {
   entries.forEach((entry) => {
     const recipe = state.recipes.find((item) => item.id === entry.recipe_id);
     (recipe?.ingredients || []).forEach((ingredient) => {
-      const shoppingIngredient = convertVegetableUnit(ingredient);
+      const shoppingIngredient = convertVegetableUnit(normalizeShoppingIngredient(ingredient));
       const name = normalizeIngredientName(shoppingIngredient.name);
       if (!name) return;
       const unit = shoppingIngredient.unit || "";
       const key = `${toISODate(state.weekCursor)}:${name}:${unit}`;
       const current = bucket.get(key) || { key, name, unit, quantity: 0, raw: [] };
       if (typeof shoppingIngredient.quantity === "number" && Number.isFinite(shoppingIngredient.quantity)) current.quantity += shoppingIngredient.quantity;
-      else current.raw.push(formatIngredient(shoppingIngredient));
+      else current.raw.push(formatIngredientAmount(shoppingIngredient) || "適量");
       bucket.set(key, current);
     });
   });
@@ -859,6 +915,8 @@ async function signOut() {
 function parseIngredientLine(line) {
   const normalized = String(line || "").trim().replace(/\s+/g, " ");
   if (!normalized) return { name: "", quantity: null, unit: "", note: "" };
+  const qualitativeMatch = normalized.match(/^(.+?)\s+(適量|少々|ひとつまみ)(?:\s*(.*))?$/);
+  if (qualitativeMatch) return { name: qualitativeMatch[1].trim(), quantity: null, unit: "", note: [qualitativeMatch[2], qualitativeMatch[3]].filter(Boolean).join(" ") };
   const match = normalized.match(/^(.+?)\s+([0-9０-９./]+(?:\s*\/\s*[0-9０-９.]+)?)(g|kg|ml|l|L|cc|個|本|枚|切れ|袋|丁|束|パック|株|缶|箱|かけ|合|玉|大さじ|小さじ|カップ)?(?:\s*(.*))?$/);
   if (!match) {
     const spoonMatch = normalized.match(/^(.+?)\s+(大さじ|小さじ|カップ)([0-9０-９./]+)(.*)$/);
@@ -866,6 +924,17 @@ function parseIngredientLine(line) {
     return { name: normalized, quantity: null, unit: "", note: "" };
   }
   return { name: match[1].trim(), quantity: parseJapaneseNumber(match[2]), unit: match[3] || "", note: (match[4] || "").trim() };
+}
+
+function normalizeShoppingIngredient(ingredient) {
+  const name = String(ingredient?.name || "").normalize("NFKC").trim().replace(/\s+/g, " ");
+  const qualitativeMatch = name.match(/^(.+?)\s+(適量|少々|ひとつまみ)(?:\s*(.*))?$/);
+  if (!qualitativeMatch) return ingredient;
+  return {
+    ...ingredient,
+    name: qualitativeMatch[1].trim(),
+    note: [qualitativeMatch[2], qualitativeMatch[3], ingredient?.note].filter(Boolean).join(" ")
+  };
 }
 
 function parseJapaneseNumber(value) {
