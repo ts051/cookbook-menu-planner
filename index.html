@@ -9,10 +9,10 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=20260908" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260909-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260909-2" />
     <script src="./supabase-config.js"></script>
     <script defer src="./hotcook-recipes.js?v=20260908-1"></script>
-    <script defer src="./app.js?v=20260909-1"></script>
+    <script defer src="./app.js?v=20260909-2"></script>
   </head>
   <body>
     <header class="site-header">
@@ -100,6 +100,22 @@
           <section><h3>作り方</h3><ol id="dialogSteps" class="step-list"></ol></section>
         </div>
         <button id="dialogSelectButton" class="primary-button wide-button" type="button">このメニューの日付を選ぶ</button>
+      </div>
+    </dialog>
+
+    <dialog id="datePickerDialog" class="date-picker-dialog">
+      <div class="date-picker-header">
+        <button id="datePickerPrev" class="icon-button" type="button" aria-label="前の月">‹</button>
+        <h2 id="datePickerMonth"></h2>
+        <button id="datePickerNext" class="icon-button" type="button" aria-label="次の月">›</button>
+      </div>
+      <div class="date-picker-weekdays" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+      <div id="datePickerGrid" class="date-picker-grid" role="grid" aria-label="日付を選択"></div>
+      <p id="datePickerMessage" class="form-message" aria-live="polite"></p>
+      <div class="date-picker-actions">
+        <button id="datePickerReset" class="text-button" type="button">リセット</button>
+        <button id="datePickerCancel" class="secondary-button" type="button">キャンセル</button>
+        <button id="datePickerConfirm" class="primary-button" type="button" disabled>確定</button>
       </div>
     </dialog>
 

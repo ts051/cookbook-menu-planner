@@ -46,6 +46,9 @@ const vegetableUnitRules = [
 let supabaseClient = null;
 let currentUser = null;
 let currentDialogRecipeId = "";
+let datePickerRecipeId = "";
+let datePickerCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let datePickerSelectedDate = "";
 let toastTimer = null;
 const recipeSelections = new Map();
 const els = {};
@@ -75,7 +78,9 @@ function bindElements() {
     "usernameInput", "passwordInput", "authBadge", "appContent", "genreContainer", "weekRange",
     "prevWeekButton", "currentWeekButton", "nextWeekButton", "weeklyGrid", "shoppingWeekRange", "shoppingProgress",
     "shoppingList", "prevShoppingWeekButton", "currentShoppingWeekButton", "nextShoppingWeekButton", "recipeDialog", "closeRecipeDialog", "dialogRecipeImage", "dialogRecipeGenre", "dialogRecipeTitle",
-    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "toast"
+    "dialogRecipeMeta", "dialogIngredients", "dialogSteps", "dialogSelectButton", "datePickerDialog", "datePickerPrev",
+    "datePickerNext", "datePickerMonth", "datePickerGrid", "datePickerMessage", "datePickerReset", "datePickerCancel",
+    "datePickerConfirm", "toast"
   ].forEach((id) => { els[id] = document.getElementById(id); });
 }
 
@@ -97,6 +102,12 @@ function bindEvents() {
   els.closeRecipeDialog.addEventListener("click", () => els.recipeDialog.close());
   els.dialogSelectButton.addEventListener("click", toggleDialogRecipeSelection);
   els.recipeDialog.addEventListener("click", (event) => { if (event.target === els.recipeDialog) els.recipeDialog.close(); });
+  els.datePickerPrev.addEventListener("click", () => moveDatePickerMonth(-1));
+  els.datePickerNext.addEventListener("click", () => moveDatePickerMonth(1));
+  els.datePickerReset.addEventListener("click", resetDatePicker);
+  els.datePickerCancel.addEventListener("click", () => els.datePickerDialog.close());
+  els.datePickerConfirm.addEventListener("click", confirmDatePicker);
+  els.datePickerDialog.addEventListener("click", (event) => { if (event.target === els.datePickerDialog) els.datePickerDialog.close(); });
   window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
 }
 
@@ -164,14 +175,14 @@ function createRecipeCard(recipe) {
     <div class="recipe-card-body">
       <button class="recipe-title-button" type="button"><h3>${escapeHTML(recipe.title)}</h3></button>
       <div class="recipe-card-controls">
-        <label><span>日付選択</span><input class="recipe-date" type="date" value="${escapeHTML(selection.date)}" aria-label="${escapeHTML(recipe.title)}の日付" /></label>
+        <button class="recipe-date-button secondary-button" type="button">日付選択</button>
         <label><span>食種選択</span><select class="recipe-meal-type" aria-label="${escapeHTML(recipe.title)}の食種">${mealTypeOptions(selection.mealType)}</select></label>
       </div>
     </div>
   `;
   card.querySelector(".recipe-thumb-button").addEventListener("click", () => openRecipeDialog(recipe));
   card.querySelector(".recipe-title-button").addEventListener("click", () => openRecipeDialog(recipe));
-  card.querySelector(".recipe-date").addEventListener("change", (event) => { void updateRecipeSelection(recipe.id, "date", event.target.value, card); });
+  card.querySelector(".recipe-date-button").addEventListener("click", () => openDatePicker(recipe.id));
   card.querySelector(".recipe-meal-type").addEventListener("change", (event) => { void updateRecipeSelection(recipe.id, "mealType", event.target.value, card); });
   return card;
 }
@@ -196,7 +207,6 @@ async function updateRecipeSelection(id, field, value, card) {
     const saved = await saveRecipeMealType(recipe, value);
     if (!saved) return;
   }
-  if (recipe && selection.date && selection.mealType) await addRecipeToWeek(recipe, selection, card);
 }
 
 async function saveRecipeMealType(recipe, mealType) {
@@ -245,7 +255,77 @@ function updateDialogSelectButton() {
 function toggleDialogRecipeSelection() {
   const recipeId = currentDialogRecipeId;
   els.recipeDialog.close();
-  document.querySelector(`.recipe-card[data-recipe-id="${CSS.escape(recipeId)}"] .recipe-date`)?.focus();
+  openDatePicker(recipeId);
+}
+
+function openDatePicker(recipeId) {
+  datePickerRecipeId = recipeId;
+  datePickerSelectedDate = "";
+  const today = new Date();
+  datePickerCursor = new Date(today.getFullYear(), today.getMonth(), 1);
+  els.datePickerMessage.textContent = "";
+  renderDatePicker();
+  els.datePickerDialog.showModal();
+}
+
+function moveDatePickerMonth(delta) {
+  datePickerCursor = new Date(datePickerCursor.getFullYear(), datePickerCursor.getMonth() + delta, 1);
+  datePickerSelectedDate = "";
+  els.datePickerMessage.textContent = "";
+  renderDatePicker();
+}
+
+function resetDatePicker() {
+  datePickerSelectedDate = "";
+  els.datePickerMessage.textContent = "";
+  renderDatePicker();
+}
+
+function renderDatePicker() {
+  const year = datePickerCursor.getFullYear();
+  const month = datePickerCursor.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  els.datePickerMonth.textContent = `${year}年${month + 1}月`;
+  els.datePickerGrid.innerHTML = "";
+  for (let index = 0; index < firstWeekday; index += 1) {
+    const spacer = document.createElement("span");
+    spacer.className = "date-picker-spacer";
+    els.datePickerGrid.append(spacer);
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month, day);
+    const iso = toISODate(date);
+    const button = document.createElement("button");
+    button.className = `date-picker-day${iso === datePickerSelectedDate ? " selected" : ""}${iso === toISODate(new Date()) ? " today" : ""}`;
+    button.type = "button";
+    button.textContent = String(day);
+    button.setAttribute("aria-label", `${year}年${month + 1}月${day}日`);
+    button.setAttribute("aria-selected", String(iso === datePickerSelectedDate));
+    button.addEventListener("click", () => {
+      datePickerSelectedDate = iso;
+      els.datePickerMessage.textContent = `${month + 1}/${day}を選択中`;
+      renderDatePicker();
+    });
+    els.datePickerGrid.append(button);
+  }
+  els.datePickerConfirm.disabled = !datePickerSelectedDate;
+}
+
+async function confirmDatePicker() {
+  if (!datePickerSelectedDate) return;
+  const recipe = state.recipes.find((item) => item.id === datePickerRecipeId);
+  const card = document.querySelector(`.recipe-card[data-recipe-id="${CSS.escape(datePickerRecipeId)}"]`);
+  const mealType = card?.querySelector(".recipe-meal-type")?.value || savedRecipeMealType(recipe);
+  if (!recipe || !card) return;
+  if (!mealType) {
+    els.datePickerMessage.textContent = "先に食種を選択してください。";
+    return;
+  }
+  const selectedDate = datePickerSelectedDate;
+  els.datePickerConfirm.disabled = true;
+  els.datePickerDialog.close();
+  await addRecipeToWeek(recipe, { date: selectedDate, mealType }, card);
 }
 
 async function addRecipeToWeek(recipe, selection, card) {
@@ -276,7 +356,6 @@ async function addRecipeToWeek(recipe, selection, card) {
   }
 
   recipeSelections.delete(recipe.id);
-  card.querySelector(".recipe-date").value = "";
   card.classList.remove("selected", "saving");
   state.weekCursor = startOfWeek(new Date(`${selection.date}T00:00:00`));
   renderWeekViews();
