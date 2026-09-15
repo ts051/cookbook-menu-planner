@@ -51,6 +51,9 @@ let datePickerRecipeId = "";
 let datePickerCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let datePickerSelectedDate = "";
 let toastTimer = null;
+let sharedWrites = 0;
+let sharedRevision = 0;
+let sharedRefreshPending = false;
 const recipeSelections = new Map();
 const els = {};
 const state = {
@@ -70,6 +73,7 @@ async function init() {
   await setupStorage();
   await loadAll();
   render();
+  window.setInterval(refreshSharedViews, 15000);
 }
 
 function bindElements() {
@@ -112,6 +116,8 @@ function bindEvents() {
   els.datePickerCancel.addEventListener("click", () => els.datePickerDialog.close());
   els.datePickerConfirm.addEventListener("click", confirmDatePicker);
   els.datePickerDialog.addEventListener("click", (event) => { if (event.target === els.datePickerDialog) els.datePickerDialog.close(); });
+  window.addEventListener("focus", refreshSharedViews);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedViews(); });
   window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
 }
 
@@ -138,6 +144,7 @@ function switchView(view) {
   if (view === "week") renderWeek();
   if (view === "shopping") renderShoppingList();
   window.scrollTo({ top: 0, behavior: "smooth" });
+  refreshSharedViews();
 }
 
 function renderHome() {
@@ -223,7 +230,7 @@ async function saveRecipeMealType(recipe, mealType) {
   if (mealTypes.some((type) => type.id === mealType)) nextTags.push(`${MEAL_TYPE_TAG_PREFIX}${mealType}`);
   recipe.tags = nextTags;
   if (canUseRemote()) {
-    const { error } = await supabaseClient.from("recipes").update({ tags: nextTags }).eq("id", recipe.id);
+    const { error } = await writeShared(supabaseClient.from("recipes").update({ tags: nextTags }).eq("id", recipe.id));
     if (error) {
       console.error(error);
       recipe.tags = previousTags;
@@ -391,7 +398,7 @@ async function addRecipeToWeek(recipe, selection, card) {
   card?.classList.add("saving");
 
   if (canUseRemote()) {
-    const { error } = await supabaseClient.from("meal_plan_entries").upsert({ ...entry, user_id: currentUser.id }, { onConflict: "user_id,plan_date,meal_slot" });
+    const { error } = await writeShared(supabaseClient.from("meal_plan_entries").upsert({ ...entry, user_id: currentUser.id }, { onConflict: "plan_date,meal_slot" }));
     if (error) {
       console.error(error);
       showToast("登録できませんでした");
@@ -484,7 +491,7 @@ function renderWeek() {
 
 async function removePlanEntry(entry) {
   if (canUseRemote()) {
-    const { error } = await supabaseClient.from("meal_plan_entries").delete().eq("id", entry.id);
+    const { error } = await writeShared(supabaseClient.from("meal_plan_entries").delete().eq("id", entry.id));
     if (error) { console.error(error); showToast("削除できませんでした"); return; }
     await loadRemote();
   } else {
@@ -560,15 +567,20 @@ function convertVegetableUnit(ingredient) {
 }
 
 async function toggleShoppingCheck(key, checked) {
+  const previous = Boolean(state.checks[key]);
   state.checks[key] = checked;
   if (canUseRemote()) {
-    const { error } = await supabaseClient.from("shopping_checks").upsert({
+    const { error } = await writeShared(supabaseClient.from("shopping_checks").upsert({
       user_id: currentUser.id,
       week_start: toISODate(state.weekCursor),
       item_key: key,
       checked
-    }, { onConflict: "user_id,week_start,item_key" });
-    if (error) console.error(error);
+    }, { onConflict: "week_start,item_key" }));
+    if (error) {
+      console.error(error);
+      state.checks[key] = previous;
+      showToast("チェックを保存できませんでした");
+    }
   } else saveLocal();
   renderShoppingList();
 }
@@ -601,10 +613,11 @@ async function setupStorage() {
     els.storageBadge.textContent = "Cloud";
     const { data } = await supabaseClient.auth.getSession();
     currentUser = data.session?.user || null;
-    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
       currentUser = session?.user || null;
-      await loadAll();
-      render();
+      recipeSelections.clear();
+      // Run database requests after the auth callback releases its lock.
+      window.setTimeout(async () => { await loadAll(); render(); }, 0);
     });
   } catch (error) {
     console.error(error);
@@ -629,7 +642,7 @@ function loadScript(src, id) {
 }
 
 function canUseRemote() {
-  return Boolean(supabaseClient && (!config.REQUIRE_AUTH || currentUser));
+  return Boolean(supabaseClient && currentUser);
 }
 
 async function loadAll() {
@@ -637,7 +650,7 @@ async function loadAll() {
     const loaded = await loadRemote();
     if (loaded) {
       await seedDefaultRecipesIfNeeded();
-      await removeDuplicateRecipes();
+      // Shared recipe uniqueness is enforced by the database.
     }
   } else {
     loadLocal();
@@ -681,20 +694,48 @@ async function removeDuplicateRecipes() {
   if (!canUseRemote()) saveLocal();
 }
 
-async function loadRemote() {
+async function writeShared(query) {
+  sharedWrites += 1;
+  sharedRevision += 1;
+  try { return await query; }
+  finally { sharedWrites -= 1; sharedRevision += 1; }
+}
+
+async function refreshSharedViews() {
+  if (!canUseRemote() || document.hidden || sharedWrites || sharedRefreshPending) return;
+  if (document.querySelector('dialog[open]') || document.activeElement?.matches('select, input:not([type="checkbox"]), textarea')) return;
+  sharedRefreshPending = true;
+  try {
+    if (await loadRemote(false)) {
+      if (document.querySelector('dialog[open]') || document.activeElement?.matches('select, input:not([type="checkbox"]), textarea')) return;
+      recipeSelections.clear();
+      renderHome();
+      renderWeekViews();
+    }
+  } catch (error) { console.error(error); }
+  finally { sharedRefreshPending = false; }
+}
+
+async function loadRemote(includeProfile = true) {
+  const userId = currentUser?.id;
+  const revision = sharedRevision;
+  if (!userId) return false;
   const [recipesResult, planResult, checksResult, profileResult] = await Promise.all([
     supabaseClient.from("recipes").select("*").order("created_at", { ascending: false }),
     supabaseClient.from("meal_plan_entries").select("*").order("plan_date", { ascending: true }),
     supabaseClient.from("shopping_checks").select("*"),
-    supabaseClient.from("profiles").select("id, username").eq("id", currentUser.id).maybeSingle()
+    includeProfile ? supabaseClient.from("profiles").select("id, username").eq("id", userId).maybeSingle() : Promise.resolve({ data: state.profile })
   ]);
   const error = recipesResult.error || planResult.error || checksResult.error || profileResult.error;
-  if (error) { console.error(error); loadLocal(); return false; }
+  if (error) { console.error(error); if (includeProfile) showToast("共有データを読み込めませんでした"); return false; }
+  if (currentUser?.id !== userId || revision !== sharedRevision || sharedWrites) return false;
   state.recipes = recipesResult.data || [];
   state.plan = planResult.data || [];
   state.checks = Object.fromEntries((checksResult.data || []).map((item) => [item.item_key, item.checked]));
-  state.profile = profileResult.data || await ensureProfile(currentUser, emailLocalPart(currentUser.email));
-  if (state.profile?.username) await replaceLoginId(currentUser, state.profile.username, false);
+  if (includeProfile) {
+    state.profile = profileResult.data || await ensureProfile(currentUser, emailLocalPart(currentUser.email));
+    if (state.profile?.username) await replaceLoginId(currentUser, state.profile.username, false);
+  }
   return true;
 }
 
@@ -742,9 +783,9 @@ async function seedDefaultRecipesIfNeeded() {
   if (canUseRemote()) {
     if (recipes.length) {
       const payload = recipes.map((recipe) => ({ ...recipe, user_id: currentUser.id }));
-      const { data, error } = await supabaseClient.from("recipes").insert(payload).select("*");
+      const { error } = await writeShared(supabaseClient.from("recipes").upsert(payload, { onConflict: "title", ignoreDuplicates: true }).select("*"));
       if (error) { console.error(error); return; }
-      state.recipes = [...(data || recipes), ...state.recipes];
+      await loadRemote(false);
     }
   } else if (recipes.length) {
     state.recipes = [...recipes, ...state.recipes];

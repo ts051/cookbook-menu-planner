@@ -2,8 +2,8 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.recipes (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  title text not null unique,
   source_title text,
   servings integer not null default 2,
   tags text[] not null default '{}',
@@ -48,22 +48,22 @@ for each row execute function public.enforce_user_label_limit();
 
 create table if not exists public.meal_plan_entries (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
   plan_date date not null,
   meal_slot text not null default 'dinner',
   recipe_id uuid not null references public.recipes(id) on delete cascade,
   created_at timestamptz not null default now(),
-  unique (user_id, plan_date, meal_slot)
+  unique (plan_date, meal_slot)
 );
 
 create table if not exists public.shopping_checks (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
   week_start date not null,
   item_key text not null,
   checked boolean not null default false,
   updated_at timestamptz not null default now(),
-  unique (user_id, week_start, item_key)
+  unique (week_start, item_key)
 );
 
 create table if not exists public.profiles (
@@ -155,79 +155,34 @@ to authenticated
 using (auth.uid() = user_id);
 
 drop policy if exists "recipes_select_own" on public.recipes;
-create policy "recipes_select_own"
-on public.recipes for select
-to authenticated
-using (auth.uid() = user_id);
-
 drop policy if exists "recipes_insert_own" on public.recipes;
-create policy "recipes_insert_own"
-on public.recipes for insert
-to authenticated
-with check (auth.uid() = user_id);
-
 drop policy if exists "recipes_update_own" on public.recipes;
-create policy "recipes_update_own"
-on public.recipes for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
 drop policy if exists "recipes_delete_own" on public.recipes;
-create policy "recipes_delete_own"
-on public.recipes for delete
-to authenticated
-using (auth.uid() = user_id);
+drop policy if exists "recipes_shared" on public.recipes;
+create policy "recipes_shared" on public.recipes
+for all to authenticated
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
 
 drop policy if exists "meal_plan_select_own" on public.meal_plan_entries;
-create policy "meal_plan_select_own"
-on public.meal_plan_entries for select
-to authenticated
-using (auth.uid() = user_id);
-
 drop policy if exists "meal_plan_insert_own" on public.meal_plan_entries;
-create policy "meal_plan_insert_own"
-on public.meal_plan_entries for insert
-to authenticated
-with check (auth.uid() = user_id);
-
 drop policy if exists "meal_plan_update_own" on public.meal_plan_entries;
-create policy "meal_plan_update_own"
-on public.meal_plan_entries for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
 drop policy if exists "meal_plan_delete_own" on public.meal_plan_entries;
-create policy "meal_plan_delete_own"
-on public.meal_plan_entries for delete
-to authenticated
-using (auth.uid() = user_id);
+drop policy if exists "meal_plan_entries_shared" on public.meal_plan_entries;
+create policy "meal_plan_entries_shared" on public.meal_plan_entries
+for all to authenticated
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
 
 drop policy if exists "shopping_checks_select_own" on public.shopping_checks;
-create policy "shopping_checks_select_own"
-on public.shopping_checks for select
-to authenticated
-using (auth.uid() = user_id);
-
 drop policy if exists "shopping_checks_insert_own" on public.shopping_checks;
-create policy "shopping_checks_insert_own"
-on public.shopping_checks for insert
-to authenticated
-with check (auth.uid() = user_id);
-
 drop policy if exists "shopping_checks_update_own" on public.shopping_checks;
-create policy "shopping_checks_update_own"
-on public.shopping_checks for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
 drop policy if exists "shopping_checks_delete_own" on public.shopping_checks;
-create policy "shopping_checks_delete_own"
-on public.shopping_checks for delete
-to authenticated
-using (auth.uid() = user_id);
+drop policy if exists "shopping_checks_shared" on public.shopping_checks;
+create policy "shopping_checks_shared" on public.shopping_checks
+for all to authenticated
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
