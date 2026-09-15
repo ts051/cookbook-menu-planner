@@ -202,10 +202,7 @@ function savedRecipeMealType(recipe) {
 }
 
 function effectiveRecipeMealType(recipe) {
-  const saved = savedRecipeMealType(recipe);
-  if (saved) return saved;
-  const tags = Array.isArray(recipe?.tags) ? recipe.tags : [];
-  return mealTypes.find((type) => tags.includes(type.label))?.id || "";
+  return savedRecipeMealType(recipe);
 }
 
 async function updateRecipeSelection(id, field, value, card) {
@@ -495,7 +492,7 @@ async function removePlanEntry(entry) {
     saveLocal();
   }
   renderWeekViews();
-  showToast("1週間メニューから削除しました");
+  showToast("週間メニューから削除しました");
 }
 
 function moveWeek(delta) {
@@ -510,7 +507,7 @@ function renderShoppingList() {
   const items = getShoppingItems();
   els.shoppingList.innerHTML = "";
   if (!items.length) {
-    els.shoppingList.innerHTML = `<div class="empty-state">1週間メニューを登録すると、必要な食材がここにまとまります。</div>`;
+    els.shoppingList.innerHTML = `<div class="empty-state">週間メニューを登録すると、必要な食材がここにまとまります。</div>`;
     els.shoppingProgress.textContent = "0 / 0";
     return;
   }

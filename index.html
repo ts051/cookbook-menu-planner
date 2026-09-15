@@ -9,10 +9,10 @@
     <link rel="manifest" href="/cookbook-menu-planner/manifest.webmanifest?v=20260908" />
     <link rel="icon" type="image/png" sizes="192x192" href="/cookbook-menu-planner/assets/cookbook-menu-planner-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/cookbook-menu-planner/assets/cookbook-menu-planner-apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260909-4" />
+    <link rel="stylesheet" href="./styles.css?v=20260915-1" />
     <script src="./supabase-config.js"></script>
     <script defer src="./hotcook-recipes.js?v=20260908-1"></script>
-    <script defer src="./app.js?v=20260909-4"></script>
+    <script defer src="./app.js?v=20260915-1"></script>
   </head>
   <body>
     <header class="site-header">
@@ -20,8 +20,8 @@
         <button id="menuButton" class="icon-button menu-button" type="button" aria-label="アカウントメニューを開く" aria-controls="appMenu" aria-expanded="false"><span class="hamburger" aria-hidden="true"></span></button>
         <button class="brand" type="button" data-view-link="home" aria-label="メインページへ"><span class="brand-mark">⌂</span><span>きょうのこんだて</span></button>
         <nav class="desktop-nav" aria-label="メインナビゲーション">
-          <button class="nav-button active" type="button" data-view-link="home">メニュー</button>
-          <button class="nav-button" type="button" data-view-link="week">1週間メニュー</button>
+          <button class="nav-button active" type="button" data-view-link="home">レシピ</button>
+          <button class="nav-button" type="button" data-view-link="week">週間メニュー</button>
           <button class="nav-button" type="button" data-view-link="shopping">買い物</button>
         </nav>
         <span id="storageBadge" class="storage-badge">Local</span>
@@ -58,14 +58,14 @@
       <div id="appContent">
         <section class="app-view" data-view="home">
           <div class="page-intro">
-            <div><span class="eyebrow">HOTCOOK RECIPE BOOK</span><h1>今週、何をつくる？</h1><p>食種を選び、日付を選ぶと週間メニューへ追加されます。</p></div>
+            <div><h1>レシピ集</h1><p>食種を選び、日付を選ぶと週間メニューへ追加されます。</p></div>
           </div>
           <div id="genreContainer" class="genre-container"></div>
         </section>
 
         <section class="app-view hidden" data-view="week">
           <div class="view-heading">
-            <div><span class="eyebrow">WEEKLY MENU</span><h1>1週間メニュー</h1><p id="weekRange"></p></div>
+            <div><span class="eyebrow">WEEKLY MENU</span><h1>週間メニュー</h1><p id="weekRange"></p></div>
             <div class="week-controls"><button id="prevWeekButton" class="icon-button" type="button" aria-label="前の週">‹</button><button id="currentWeekButton" class="secondary-button" type="button">今週</button><button id="nextWeekButton" class="icon-button" type="button" aria-label="次の週">›</button></div>
           </div>
           <div id="weeklyGrid" class="weekly-grid"></div>
@@ -85,9 +85,9 @@
     </main>
 
     <nav class="mobile-nav" aria-label="メインナビゲーション">
-      <button class="mobile-nav-button active" type="button" data-view-link="home"><span>⌂</span>メニュー</button>
-      <button class="mobile-nav-button" type="button" data-view-link="week"><span>▦</span>1週間</button>
-      <button class="mobile-nav-button" type="button" data-view-link="shopping"><span>✓</span>買い物</button>
+      <button class="mobile-nav-button active" type="button" data-view-link="home">レシピ</button>
+      <button class="mobile-nav-button" type="button" data-view-link="week">週間</button>
+      <button class="mobile-nav-button" type="button" data-view-link="shopping">買い物</button>
     </nav>
 
     <dialog id="recipeDialog" class="recipe-dialog">
